@@ -1,0 +1,15 @@
+{
+  "canisters": {
+    "NacDBReorder_test": {
+      "main": "src/test/main.mo",
+      "type": "motoko"
+    },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  },
+  "output_env_file": ".env",
+  "version": 1
+}
