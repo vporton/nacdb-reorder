@@ -17,14 +17,14 @@ import Principal "mo:base/Principal";
 import BTree "mo:btree/BTree";
 
 module {
-    public type Reorderer = {
+    public type Orderer = {
         var rng: Prng.Seiran128;
         // guidGen: GUID.GUIDGenerator;
         adding: OpsQueue.OpsQueue<AddingItem, ()>;
         block: BTree.BTree<(Nac.OuterCanister, Nac.OuterSubDBKey), ()>;
     };
 
-    public type Reorder = {
+    public type Order = {
         // A random string is added to a key in order to ensure key are unique.
         order: (Nac.OuterCanister, Nac.OuterSubDBKey); // Key#random -> Value.
         reverse: (Nac.OuterCanister, Nac.OuterSubDBKey); // Value -> Key#random
@@ -32,8 +32,8 @@ module {
 
     type AddingOptions = {
         index: Nac.IndexCanister;
-        orderer: Reorderer;
-        reorder: Reorder;
+        orderer: Orderer;
+        reorder: Order;
         key: Nac.OuterSubDBKey;
         value: Nat;
     };
@@ -80,7 +80,7 @@ module {
         };
     };
 
-    public func addFinish(guid: GUID, orderer: Reorderer) : async* ?() {
+    public func addFinish(guid: GUID, orderer: Orderer) : async* ?() {
         OpsQueue.result(orderer.adding, guid);
     };
 
