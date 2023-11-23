@@ -3,7 +3,8 @@
     "NacDBReorder_test": {
       "main": "src/test/main.mo",
       "type": "motoko"
-    },
+    }
+  },
   "defaults": {
     "build": {
       "args": "",
