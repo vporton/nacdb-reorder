@@ -33,7 +33,7 @@ module {
     type AddingOptions = {
         index: Nac.IndexCanister;
         orderer: Orderer;
-        reorder: Order;
+        order: Order;
         key: Nac.OuterSubDBKey;
         value: Nat;
     };
@@ -60,13 +60,13 @@ module {
             case (?op) { { options = op; random } };
             case null {
                 // TODO: It is enough to use one condition instead of two, because they are bijective.
-                if (BTree.has(options.orderer.block, compareLocs, options.reorder.order) or
-                    BTree.has(options.orderer.block, compareLocs, options.reorder.reverse)
+                if (BTree.has(options.orderer.block, compareLocs, options.order.order) or
+                    BTree.has(options.orderer.block, compareLocs, options.order.reverse)
                 ) {
                     Debug.trap("deleting is blocked");
                 };
-                ignore BTree.insert(options.orderer.block, compareLocs, options.reorder.order);
-                ignore BTree.insert(options.orderer.block, compareLocs, options.reorder.reverse);
+                ignore BTree.insert(options.orderer.block, compareLocs, options.order.order);
+                ignore BTree.insert(options.orderer.block, compareLocs, options.order.reverse);
                 { options; random };
             };
         };
@@ -87,21 +87,21 @@ module {
     func addFinishByQueue(guid: GUID, adding: AddingItem) : async* () {
         let key2 = encodeNat(adding.options.key) # encodeNat64(adding.random);
         let q1 = adding.options.index.insert(Blob.toArray(guid), {
-            outerCanister = Principal.fromActor(adding.options.reorder.order.0);
-            outerKey = adding.options.reorder.order.1;
+            outerCanister = Principal.fromActor(adding.options.order.order.0);
+            outerKey = adding.options.order.order.1;
             sk = key2;
             value = #int(adding.options.value);
         });
         let q2 = adding.options.index.insert(Blob.toArray(guid), {
-            outerCanister = Principal.fromActor(adding.options.reorder.reverse.0);
-            outerKey = adding.options.reorder.reverse.1;
+            outerCanister = Principal.fromActor(adding.options.order.reverse.0);
+            outerKey = adding.options.order.reverse.1;
             sk = encodeNat(adding.options.value);
             value = #text key2;
         });
         ignore (await q1, await q2); // idempotent
 
-        ignore BTree.delete(options.orderer.block, compareLocs, options.reorder.order);
-        ignore BTree.delete(options.orderer.block, compareLocs, options.reorder.reverse);
+        ignore BTree.delete(options.orderer.block, compareLocs, options.order.order);
+        ignore BTree.delete(options.orderer.block, compareLocs, options.order.reverse);
     };
 
     // TODO: duplicate code with `zondirectory2` repo
