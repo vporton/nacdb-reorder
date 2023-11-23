@@ -15,7 +15,6 @@ import Char "mo:base/Char";
 import Nat32 "mo:base/Nat32";
 import Principal "mo:base/Principal";
 import BTree "mo:btree/BTree";
-import Reorder "Reorder";
 
 module {
     public type Reorderer = {
