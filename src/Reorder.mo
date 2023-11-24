@@ -14,6 +14,8 @@ import Text "mo:base/Text";
 import Char "mo:base/Char";
 import Nat32 "mo:base/Nat32";
 import Principal "mo:base/Principal";
+import Nat "mo:base/Nat";
+import Debug "mo:base/Debug";
 import BTree "mo:btree/BTree";
 
 module {
@@ -40,16 +42,16 @@ module {
 
     type AddingItem = {
         options: AddingOptions;
-        random: Nat;
+        random: Nat64;
     };
 
     /// We assume that all keys have the same length.
     ///
     /// Reentrant.
     public func add(guid: GUID.GUID, options: AddingOptions): async* () {
-        ignore OpsQueue.whilePending(options.orderer.adding, func(guid: GUID.GUID, elt: InsertingItem): async* () {
+        ignore OpsQueue.whilePending(options.orderer.adding, func(guid: GUID.GUID, elt: AddingItem): async* () {
             OpsQueue.answer(
-                orderer.adding,
+                options.orderer.adding,
                 guid,
                 await* addFinishByQueue(guid, elt));
         });
@@ -65,8 +67,8 @@ module {
                 ) {
                     Debug.trap("deleting is blocked");
                 };
-                ignore BTree.insert(options.orderer.block, compareLocs, options.order.order);
-                ignore BTree.insert(options.orderer.block, compareLocs, options.order.reverse);
+                ignore BTree.insert(options.orderer.block, compareLocs, options.order.order, ());
+                ignore BTree.insert(options.orderer.block, compareLocs, options.order.reverse, ());
                 { options; random };
             };
         };
@@ -80,11 +82,11 @@ module {
         };
     };
 
-    public func addFinish(guid: GUID, orderer: Orderer) : async* ?() {
+    public func addFinish(guid: GUID.GUID, orderer: Orderer) : async* ?() {
         OpsQueue.result(orderer.adding, guid);
     };
 
-    func addFinishByQueue(guid: GUID, adding: AddingItem) : async* () {
+    func addFinishByQueue(guid: GUID.GUID, adding: AddingItem) : async* () {
         let key2 = encodeNat(adding.options.key) # encodeNat64(adding.random);
         let q1 = adding.options.index.insert(Blob.toArray(guid), {
             outerCanister = Principal.fromActor(adding.options.order.order.0);
@@ -138,5 +140,18 @@ module {
 
     public func encodeNat(n: Nat): Text {
         encodeNat64(Nat64.fromNat(n));
+    };
+
+    func comparePartition(x: Nac.PartitionCanister, y: Nac.PartitionCanister): {#equal; #greater; #less} {
+        Principal.compare(Principal.fromActor(x), Principal.fromActor(y));
+    };
+
+    func compareLocs(x: (Nac.PartitionCanister, Nac.SubDBKey), y: (Nac.PartitionCanister, Nac.SubDBKey)): {#equal; #greater; #less} {
+        let c = comparePartition(x.0, y.0);
+        if (c != #equal) {
+            c;
+        } else {
+            Nat.compare(x.1, y.1);
+        }
     };
 }
