@@ -59,7 +59,7 @@ module {
         let random = options.orderer.rng.next(); // should not generate this from GUID, to prevent user favoring his order
 
         let adding = switch (OpsQueue.get(options.orderer.adding, guid)) {
-            case (?op) { { options = op; random } };
+            case (?op) { { options = op.options; random } };
             case null {
                 // TODO: It is enough to use one condition instead of two, because they are bijective.
                 if (BTree.has(options.orderer.block, compareLocs, options.order.order) or
@@ -102,8 +102,9 @@ module {
         });
         ignore (await q1, await q2); // idempotent
 
-        ignore BTree.delete(options.orderer.block, compareLocs, options.order.order);
-        ignore BTree.delete(options.orderer.block, compareLocs, options.order.reverse);
+        // FIXME: Uncomment.
+        // ignore BTree.delete(options.orderer.block, compareLocs, options.order.order);
+        // ignore BTree.delete(options.orderer.block, compareLocs, options.order.reverse);
     };
 
     // TODO: duplicate code with `zondirectory2` repo
