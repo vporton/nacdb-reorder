@@ -102,7 +102,6 @@ module {
         });
         ignore (await q1, await q2); // idempotent
 
-        // FIXME: Uncomment.
         ignore BTree.delete(adding.options.orderer.block, compareLocs, adding.options.order.order);
         ignore BTree.delete(adding.options.orderer.block, compareLocs, adding.options.order.reverse);
     };
