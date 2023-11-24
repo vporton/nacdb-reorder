@@ -103,8 +103,8 @@ module {
         ignore (await q1, await q2); // idempotent
 
         // FIXME: Uncomment.
-        // ignore BTree.delete(options.orderer.block, compareLocs, options.order.order);
-        // ignore BTree.delete(options.orderer.block, compareLocs, options.order.reverse);
+        ignore BTree.delete(adding.options.orderer.block, compareLocs, adding.options.order.order);
+        ignore BTree.delete(adding.options.orderer.block, compareLocs, adding.options.order.reverse);
     };
 
     // TODO: duplicate code with `zondirectory2` repo
