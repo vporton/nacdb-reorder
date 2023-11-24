@@ -20,7 +20,7 @@ import BTree "mo:btree/BTree";
 
 module {
     public type Orderer = {
-        var rng: Prng.Seiran128;
+        var rng: Prng.Seiran128; // FIXME: Is 64 bits enough?
         // guidGen: GUID.GUIDGenerator;
         adding: OpsQueue.OpsQueue<AddingItem, ()>;
         block: BTree.BTree<(Nac.OuterCanister, Nac.OuterSubDBKey), ()>;
@@ -65,7 +65,7 @@ module {
                 if (BTree.has(options.orderer.block, compareLocs, options.order.order) or
                     BTree.has(options.orderer.block, compareLocs, options.order.reverse)
                 ) {
-                    Debug.trap("deleting is blocked");
+                    Debug.trap("is blocked");
                 };
                 ignore BTree.insert(options.orderer.block, compareLocs, options.order.order, ());
                 ignore BTree.insert(options.orderer.block, compareLocs, options.order.reverse, ());
@@ -105,6 +105,80 @@ module {
         ignore BTree.delete(adding.options.orderer.block, compareLocs, adding.options.order.order);
         ignore BTree.delete(adding.options.orderer.block, compareLocs, adding.options.order.reverse);
     };
+
+//////////////////////////////////
+    type DeletingOptions = {
+        index: Nac.IndexCanister;
+        orderer: Orderer;
+        order: Order;
+        value: Nat;
+    };
+
+    type DeletingItem = {
+        options: AddingOptions;
+        random: Nat64;
+    };
+
+    /// We assume that all keys have the same length.
+    ///
+    /// Reentrant.
+    public func delete(guid: GUID.GUID, options: DeletingOptions): async* () {
+        ignore OpsQueue.whilePending(options.orderer.deleting, func(guid: GUID.GUID, elt: DeletingItem): async* () {
+            OpsQueue.answer(
+                options.orderer.delting,
+                guid,
+                await* deleteFinishByQueue(guid, elt));
+        });
+
+        let adding = switch (OpsQueue.get(options.orderer.deleting, guid)) {
+            case (?op) { { options = op.options; random } };
+            case null {
+                // TODO: It is enough to use one condition instead of two, because they are bijective.
+                if (BTree.has(options.orderer.block, compareLocs, options.order.order) or
+                    BTree.has(options.orderer.block, compareLocs, options.order.reverse)
+                ) {
+                    Debug.trap("is blocked");
+                };
+                ignore BTree.insert(options.orderer.block, compareLocs, options.order.order, ());
+                ignore BTree.insert(options.orderer.block, compareLocs, options.order.reverse, ());
+                { options; random };
+            };
+        };
+
+        try {
+            await* deleteFinishByQueue(guid, deleting);
+        }
+        catch(e) {
+            OpsQueue.delete(options.orderer.deleting, guid, deleting);
+            throw e;
+        };
+    };
+
+    public func deleteFinish(guid: GUID.GUID, orderer: Orderer) : async* ?() {
+        OpsQueue.result(orderer.adding, guid);
+    };
+
+    // FIXME
+    func deleteFinishByQueue(guid: GUID.GUID, deleting: DeletingItem) : async* () {
+        let key2 = encodeNat(adding.options.key) # encodeNat64(adding.random);
+        let q1 = adding.options.index.insert(Blob.toArray(guid), {
+            outerCanister = Principal.fromActor(adding.options.order.order.0);
+            outerKey = adding.options.order.order.1;
+            sk = key2;
+            value = #int(adding.options.value);
+        });
+        let q2 = adding.options.index.insert(Blob.toArray(guid), {
+            outerCanister = Principal.fromActor(adding.options.order.reverse.0);
+            outerKey = adding.options.order.reverse.1;
+            sk = encodeNat(adding.options.value);
+            value = #text key2;
+        });
+        ignore (await q1, await q2); // idempotent
+
+        ignore BTree.delete(adding.options.orderer.block, compareLocs, adding.options.order.order);
+        ignore BTree.delete(adding.options.orderer.block, compareLocs, adding.options.order.reverse);
+    };
+//////////////////////////////////
 
     // TODO: duplicate code with `zondirectory2` repo
 
