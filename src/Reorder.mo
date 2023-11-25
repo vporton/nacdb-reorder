@@ -22,8 +22,8 @@ module {
     public type Orderer = {
         var rng: Prng.Seiran128; // FIXME: Is 64 bits enough?
         // guidGen: GUID.GUIDGenerator;
-        adding: OpsQueue.OpsQueue<AddingItem, ()>;
-        deleting: OpsQueue.OpsQueue<DeletingItem, ()>;
+        adding: OpsQueue.OpsQueue<AddItem, ()>;
+        deleting: OpsQueue.OpsQueue<DeleteItem, ()>;
         block: BTree.BTree<(Nac.OuterCanister, Nac.OuterSubDBKey), ()>;
     };
 
@@ -34,7 +34,7 @@ module {
         reverse: (Nac.OuterCanister, Nac.OuterSubDBKey); // Value -> Key#random
     };
 
-    type AddingOptions = {
+    type AddOptions = {
         index: Nac.IndexCanister;
         orderer: Orderer;
         order: Order;
@@ -42,16 +42,16 @@ module {
         value: Nat;
     };
 
-    type AddingItem = {
-        options: AddingOptions;
+    type AddItem = {
+        options: AddOptions;
         random: Nat64;
     };
 
     /// We assume that all keys have the same length.
     ///
     /// Reentrant.
-    public func add(guid: GUID.GUID, options: AddingOptions): async* () {
-        ignore OpsQueue.whilePending(options.orderer.adding, func(guid: GUID.GUID, elt: AddingItem): async* () {
+    public func add(guid: GUID.GUID, options: AddOptions): async* () {
+        ignore OpsQueue.whilePending(options.orderer.adding, func(guid: GUID.GUID, elt: AddItem): async* () {
             OpsQueue.answer(
                 options.orderer.adding,
                 guid,
@@ -89,7 +89,7 @@ module {
         OpsQueue.result(orderer.adding, guid);
     };
 
-    func addFinishByQueue(guid: GUID.GUID, adding: AddingItem) : async* () {
+    func addFinishByQueue(guid: GUID.GUID, adding: AddItem) : async* () {
         let key2 = encodeNat(adding.options.key) # encodeNat64(adding.random);
         let q1 = adding.options.index.insert(Blob.toArray(guid), {
             outerCanister = Principal.fromActor(adding.options.order.order.0);
@@ -109,21 +109,21 @@ module {
         ignore BTree.delete(adding.options.orderer.block, compareLocs, adding.options.order.reverse);
     };
 
-    type DeletingOptions = {
+    type DeleteOptions = {
         index: Nac.IndexCanister;
         orderer: Orderer;
         order: Order;
         value: Nat;
     };
 
-    type DeletingItem = {
-        options: DeletingOptions;
+    type DeleteItem = {
+        options: DeleteOptions;
         // random: Nat64;
     };
 
     /// We assume that all keys have the same length.
-    public func delete(guid: GUID.GUID, options: DeletingOptions): async* () {
-        ignore OpsQueue.whilePending(options.orderer.deleting, func(guid: GUID.GUID, elt: DeletingItem): async* () {
+    public func delete(guid: GUID.GUID, options: DeleteOptions): async* () {
+        ignore OpsQueue.whilePending(options.orderer.deleting, func(guid: GUID.GUID, elt: DeleteItem): async* () {
             OpsQueue.answer(
                 options.orderer.deleting,
                 guid,
@@ -158,7 +158,7 @@ module {
         OpsQueue.result(orderer.deleting, guid);
     };
 
-    func deleteFinishByQueue(guid: GUID.GUID, deleting: DeletingItem) : async* () {
+    func deleteFinishByQueue(guid: GUID.GUID, deleting: DeleteItem) : async* () {
         let key = await deleting.options.order.reverse.0.getByInner({
             innerKey = deleting.options.order.reverse.1;
             sk = encodeNat(deleting.options.value);
