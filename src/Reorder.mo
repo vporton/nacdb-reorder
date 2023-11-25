@@ -238,33 +238,35 @@ module {
     };
 
     func moveFinishByQueue(guid: GUID.GUID, moving: MoveItem) : async* () {
+        let newValueText = encodeNat(moving.options.value);
         let oldKey = await moving.options.order.reverse.0.getByInner({
             innerKey = moving.options.order.reverse.1;
-            sk = encodeNat(moving.options.value);
+            sk = newValueText;
         });
         if (?#int(moving.options.newKey) == oldKey) {
             return;
         };
+        let newKeyText = encodeNat(moving.options.newKey);
 
         let q1 = moving.options.index.insert(Blob.toArray(guid), {
             outerCanister = Principal.fromActor(moving.options.order.order.0);
             outerKey = moving.options.order.order.1;
-            sk = encodeNat(moving.options.newKey);
+            sk = newKeyText;
             value = #int(moving.options.value);
         });
         let q2 = moving.options.index.insert(Blob.toArray(guid), {
             outerCanister = Principal.fromActor(moving.options.order.reverse.0);
             outerKey = moving.options.order.reverse.1;
-            sk = encodeNat(moving.options.value);
-            value = #text(encodeNat(moving.options.newKey));
+            sk = newValueText;
+            value = #text(newKeyText);
         });
         ignore (await q1, await q2); // idempotent
         switch (oldKey) {
-            case (?#text keyText) {
+            case (?#text oldKeyText) {
                 await moving.options.index.delete(Blob.toArray(guid), {
                     outerCanister = Principal.fromActor(moving.options.order.order.0);
                     outerKey = moving.options.order.order.1;
-                    sk = keyText;
+                    sk = oldKeyText;
                 });
             };
             case null {}; // re-execution after an exception
