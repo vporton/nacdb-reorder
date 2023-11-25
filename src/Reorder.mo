@@ -23,6 +23,7 @@ module {
         var rng: Prng.Seiran128; // FIXME: Is 64 bits enough?
         // guidGen: GUID.GUIDGenerator;
         adding: OpsQueue.OpsQueue<AddingItem, ()>;
+        deleting: OpsQueue.OpsQueue<DeletingItem, ()>;
         block: BTree.BTree<(Nac.OuterCanister, Nac.OuterSubDBKey), ()>;
     };
 
@@ -59,9 +60,10 @@ module {
         let random = options.orderer.rng.next(); // should not generate this from GUID, to prevent user favoring his order
 
         let adding = switch (OpsQueue.get(options.orderer.adding, guid)) {
-            case (?op) { { options = op.options; random } };
+            case (?adding) { adding };
             case null {
                 // TODO: It is enough to use one condition instead of two, because they are bijective.
+                // TODO: duplicate code
                 if (BTree.has(options.orderer.block, compareLocs, options.order.order) or
                     BTree.has(options.orderer.block, compareLocs, options.order.reverse)
                 ) {
@@ -106,7 +108,6 @@ module {
         ignore BTree.delete(adding.options.orderer.block, compareLocs, adding.options.order.reverse);
     };
 
-//////////////////////////////////
     type DeletingOptions = {
         index: Nac.IndexCanister;
         orderer: Orderer;
@@ -115,23 +116,21 @@ module {
     };
 
     type DeletingItem = {
-        options: AddingOptions;
-        random: Nat64;
+        options: DeletingOptions;
+        // random: Nat64;
     };
 
     /// We assume that all keys have the same length.
-    ///
-    /// Reentrant.
     public func delete(guid: GUID.GUID, options: DeletingOptions): async* () {
         ignore OpsQueue.whilePending(options.orderer.deleting, func(guid: GUID.GUID, elt: DeletingItem): async* () {
             OpsQueue.answer(
-                options.orderer.delting,
+                options.orderer.deleting,
                 guid,
                 await* deleteFinishByQueue(guid, elt));
         });
 
-        let adding = switch (OpsQueue.get(options.orderer.deleting, guid)) {
-            case (?op) { { options = op.options; random } };
+        let deleting = switch (OpsQueue.get(options.orderer.deleting, guid)) {
+            case (?deleting) { deleting };
             case null {
                 // TODO: It is enough to use one condition instead of two, because they are bijective.
                 if (BTree.has(options.orderer.block, compareLocs, options.order.order) or
@@ -141,7 +140,7 @@ module {
                 };
                 ignore BTree.insert(options.orderer.block, compareLocs, options.order.order, ());
                 ignore BTree.insert(options.orderer.block, compareLocs, options.order.reverse, ());
-                { options; random };
+                { options };
             };
         };
 
@@ -149,36 +148,28 @@ module {
             await* deleteFinishByQueue(guid, deleting);
         }
         catch(e) {
-            OpsQueue.delete(options.orderer.deleting, guid, deleting);
+            OpsQueue.add(options.orderer.deleting, guid, deleting);
             throw e;
         };
     };
 
     public func deleteFinish(guid: GUID.GUID, orderer: Orderer) : async* ?() {
-        OpsQueue.result(orderer.adding, guid);
+        OpsQueue.result(orderer.deleting, guid);
     };
 
-    // FIXME
     func deleteFinishByQueue(guid: GUID.GUID, deleting: DeletingItem) : async* () {
-        let key2 = encodeNat(adding.options.key) # encodeNat64(adding.random);
-        let q1 = adding.options.index.insert(Blob.toArray(guid), {
-            outerCanister = Principal.fromActor(adding.options.order.order.0);
-            outerKey = adding.options.order.order.1;
-            sk = key2;
-            value = #int(adding.options.value);
-        });
-        let q2 = adding.options.index.insert(Blob.toArray(guid), {
-            outerCanister = Principal.fromActor(adding.options.order.reverse.0);
-            outerKey = adding.options.order.reverse.1;
-            sk = encodeNat(adding.options.value);
-            value = #text key2;
-        });
-        ignore (await q1, await q2); // idempotent
+        // FIXME
 
-        ignore BTree.delete(adding.options.orderer.block, compareLocs, adding.options.order.order);
-        ignore BTree.delete(adding.options.orderer.block, compareLocs, adding.options.order.reverse);
+        await deleting.options.order.reverse.0.deleteInner({
+            innerKey = deleting.options.order.reverse.1;
+            sk = encodeNat(deleting.options.value);
+        });
+
+        // FIXME
+
+        ignore BTree.delete(deleting.options.orderer.block, compareLocs, deleting.options.order.order);
+        ignore BTree.delete(deleting.options.orderer.block, compareLocs, deleting.options.order.reverse);
     };
-//////////////////////////////////
 
     // TODO: duplicate code with `zondirectory2` repo
 
