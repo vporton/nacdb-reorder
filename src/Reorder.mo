@@ -158,14 +158,29 @@ module {
     };
 
     func deleteFinishByQueue(guid: GUID.GUID, deleting: DeletingItem) : async* () {
-        // FIXME
+        let key = await deleting.options.order.reverse.0.getByInner({
+            innerKey = deleting.options.order.reverse.1;
+            sk = encodeNat(deleting.options.value);
+        });
+
+        // The order of two following statements is essential:
+        switch (key) {
+            case (?#text keyText) {
+                await deleting.options.order.order.0.deleteInner({
+                    innerKey = deleting.options.order.order.1;
+                    sk = keyText;
+                });
+            };
+            case null {}; // re-execution after an exception
+            case _ {
+                Debug.trap("programming error");
+            }
+        };
 
         await deleting.options.order.reverse.0.deleteInner({
             innerKey = deleting.options.order.reverse.1;
             sk = encodeNat(deleting.options.value);
         });
-
-        // FIXME
 
         ignore BTree.delete(deleting.options.orderer.block, compareLocs, deleting.options.order.order);
         ignore BTree.delete(deleting.options.orderer.block, compareLocs, deleting.options.order.reverse);
