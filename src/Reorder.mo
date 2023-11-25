@@ -48,8 +48,6 @@ module {
     };
 
     /// We assume that all keys have the same length.
-    ///
-    /// Reentrant.
     public func add(guid: GUID.GUID, options: AddOptions): async* () {
         ignore OpsQueue.whilePending(options.orderer.adding, func(guid: GUID.GUID, elt: AddItem): async* () {
             OpsQueue.answer(
