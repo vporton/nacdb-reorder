@@ -24,6 +24,7 @@ module {
         // guidGen: GUID.GUIDGenerator;
         adding: OpsQueue.OpsQueue<AddItem, ()>;
         deleting: OpsQueue.OpsQueue<DeleteItem, ()>;
+        moving: OpsQueue.OpsQueue<MoveItem, ()>;
         block: BTree.BTree<(Nac.OuterCanister, Nac.OuterSubDBKey), ()>;
     };
 
@@ -56,8 +57,6 @@ module {
                 await* addFinishByQueue(guid, elt));
         });
 
-        let random = options.orderer.rng.next(); // should not generate this from GUID, to prevent user favoring his order
-
         let adding = switch (OpsQueue.get(options.orderer.adding, guid)) {
             case (?adding) { adding };
             case null {
@@ -70,6 +69,8 @@ module {
                 };
                 ignore BTree.insert(options.orderer.block, compareLocs, options.order.order, ());
                 ignore BTree.insert(options.orderer.block, compareLocs, options.order.reverse, ());
+
+                let random = options.orderer.rng.next(); // should not generate this from GUID, to prevent user favoring his order
                 { options; random };
             };
         };
@@ -119,7 +120,6 @@ module {
         // random: Nat64;
     };
 
-    /// We assume that all keys have the same length.
     public func delete(guid: GUID.GUID, options: DeleteOptions): async* () {
         ignore OpsQueue.whilePending(options.orderer.deleting, func(guid: GUID.GUID, elt: DeleteItem): async* () {
             OpsQueue.answer(
@@ -186,7 +186,7 @@ module {
     };
 
     /// Move value to new key.
-    type MovingOptions = {
+    type MoveOptions = {
         index: Nac.IndexCanister;
         orderer: Orderer;
         order: Order;
@@ -194,12 +194,88 @@ module {
         value: Nat;
     };
 
-    type MovingItem = {
-        options: MovingOptions;
-        // random: Nat64;
+    type MoveItem = {
+        options: MoveOptions;
+        random: Nat64;
     };
 
-    // TODO: functions using `MovingItem`
+    public func move(guid: GUID.GUID, options: MoveOptions): async* () {
+        ignore OpsQueue.whilePending(options.orderer.moving, func(guid: GUID.GUID, elt: MoveItem): async* () {
+            OpsQueue.answer(
+                options.orderer.moving,
+                guid,
+                await* moveFinishByQueue(guid, elt));
+        });
+
+        let moving = switch (OpsQueue.get(options.orderer.moving, guid)) {
+            case (?moving) { moving };
+            case null {
+                // TODO: It is enough to use one condition instead of two, because they are bijective.
+                if (BTree.has(options.orderer.block, compareLocs, options.order.order) or
+                    BTree.has(options.orderer.block, compareLocs, options.order.reverse)
+                ) {
+                    Debug.trap("is blocked");
+                };
+                ignore BTree.insert(options.orderer.block, compareLocs, options.order.order, ());
+                ignore BTree.insert(options.orderer.block, compareLocs, options.order.reverse, ());
+
+                let random = options.orderer.rng.next(); // should not generate this from GUID, to prevent user favoring his order
+                { options; random };
+            };
+        };
+
+        try {
+            await* moveFinishByQueue(guid, moving);
+        }
+        catch(e) {
+            OpsQueue.add(options.orderer.moving, guid, moving);
+            throw e;
+        };
+    };
+
+    public func moveFinish(guid: GUID.GUID, orderer: Orderer) : async* ?() {
+        OpsQueue.result(orderer.moving, guid);
+    };
+
+    func moveFinishByQueue(guid: GUID.GUID, moving: MoveItem) : async* () {
+        let oldKey = await moving.options.order.reverse.0.getByInner({
+            innerKey = moving.options.order.reverse.1;
+            sk = encodeNat(moving.options.value);
+        });
+        if (?#int(moving.options.newKey) == oldKey) {
+            return;
+        };
+
+        let q1 = moving.options.index.insert(Blob.toArray(guid), {
+            outerCanister = Principal.fromActor(moving.options.order.order.0);
+            outerKey = moving.options.order.order.1;
+            sk = encodeNat(moving.options.newKey);
+            value = #int(moving.options.value);
+        });
+        let q2 = moving.options.index.insert(Blob.toArray(guid), {
+            outerCanister = Principal.fromActor(moving.options.order.reverse.0);
+            outerKey = moving.options.order.reverse.1;
+            sk = encodeNat(moving.options.value);
+            value = #text(encodeNat(moving.options.newKey));
+        });
+        ignore (await q1, await q2); // idempotent
+        switch (oldKey) {
+            case (?#text keyText) {
+                await moving.options.index.delete(Blob.toArray(guid), {
+                    outerCanister = Principal.fromActor(moving.options.order.order.0);
+                    outerKey = moving.options.order.order.1;
+                    sk = keyText;
+                });
+            };
+            case null {}; // re-execution after an exception
+            case _ {
+                Debug.trap("programming error");
+            }
+        };
+
+        ignore BTree.delete(moving.options.orderer.block, compareLocs, moving.options.order.order);
+        ignore BTree.delete(moving.options.orderer.block, compareLocs, moving.options.order.reverse);
+    };
 
     // TODO: duplicate code with `zondirectory2` repo
 
