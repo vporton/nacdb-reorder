@@ -190,7 +190,7 @@ module {
         index: Nac.IndexCanister;
         orderer: Orderer;
         order: Order;
-        key: Nac.OuterSubDBKey;
+        newKey: Nac.OuterSubDBKey;
         value: Nat;
     };
 
