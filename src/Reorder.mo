@@ -27,6 +27,7 @@ module {
         block: BTree.BTree<(Nac.OuterCanister, Nac.OuterSubDBKey), ()>;
     };
 
+    /// Keys may be duplicated, but all values are distinct.
     public type Order = {
         // A random string is added to a key in order to ensure key are unique.
         order: (Nac.OuterCanister, Nac.OuterSubDBKey); // Key#random -> Value.
