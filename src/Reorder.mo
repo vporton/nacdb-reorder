@@ -187,6 +187,22 @@ module {
         ignore BTree.delete(deleting.options.orderer.block, compareLocs, deleting.options.order.reverse);
     };
 
+    /// Move value to new key.
+    type MovingOptions = {
+        index: Nac.IndexCanister;
+        orderer: Orderer;
+        order: Order;
+        key: Nac.OuterSubDBKey;
+        value: Nat;
+    };
+
+    type MovingItem = {
+        options: MovingOptions;
+        // random: Nat64;
+    };
+
+    // TODO: functions using `MovingItem`
+
     // TODO: duplicate code with `zondirectory2` repo
 
     func _toLowerHexDigit(v: Nat): Char {
