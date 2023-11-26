@@ -16,15 +16,18 @@ import Nat32 "mo:base/Nat32";
 import Principal "mo:base/Principal";
 import Nat "mo:base/Nat";
 import Debug "mo:base/Debug";
+import Order "mo:base/Order";
 import BTree "mo:btree/BTree";
 
 module {
     public type Orderer = {
+        index: Nac.IndexCanister;
         var rng: Prng.Seiran128; // 64 bits seems enough (https://stackoverflow.com/a/22029380/856090)
-        // guidGen: GUID.GUIDGenerator;
+        guidGen: GUID.GUIDGenerator;
         adding: OpsQueue.OpsQueue<AddItem, ()>;
         deleting: OpsQueue.OpsQueue<DeleteItem, ()>;
         moving: OpsQueue.OpsQueue<MoveItem, ()>;
+        creatingOrder: OpsQueue.OpsQueue<CreateOrderItem, Order>;
         block: BTree.BTree<(Nac.OuterCanister, Nac.OuterSubDBKey), ()>;
     };
 
@@ -48,6 +51,8 @@ module {
     public type AddItem = {
         options: AddOptions;
         random: Nat64;
+        guid1: GUID.GUID;
+        guid2: GUID.GUID;
     };
 
     /// We assume that all keys have the same length.
@@ -72,8 +77,12 @@ module {
                 ignore BTree.insert(options.orderer.block, compareLocs, options.order.order, ());
                 ignore BTree.insert(options.orderer.block, compareLocs, options.order.reverse, ());
 
-                let random = options.orderer.rng.next(); // should not generate this from GUID, to prevent user favoring his order
-                { options; random };
+                {
+                    options;
+                    random = options.orderer.rng.next();
+                    guid1 = GUID.nextGuid(options.orderer.guidGen);
+                    guid2 = GUID.nextGuid(options.orderer.guidGen);
+                };
             };
         };
 
@@ -92,13 +101,13 @@ module {
 
     public func addFinishByQueue(guid: GUID.GUID, adding: AddItem) : async* () {
         let key2 = encodeNat(adding.options.key) # encodeNat64(adding.random);
-        let q1 = adding.options.index.insert(Blob.toArray(guid), {
+        let q1 = adding.options.index.insert(Blob.toArray(adding.guid1), {
             outerCanister = Principal.fromActor(adding.options.order.order.0);
             outerKey = adding.options.order.order.1;
             sk = key2;
             value = #int(adding.options.value);
         });
-        let q2 = adding.options.index.insert(Blob.toArray(guid), {
+        let q2 = adding.options.index.insert(Blob.toArray(adding.guid2), {
             outerCanister = Principal.fromActor(adding.options.order.reverse.0);
             outerKey = adding.options.order.reverse.1;
             sk = encodeNat(adding.options.value);
@@ -119,7 +128,6 @@ module {
 
     public type DeleteItem = {
         options: DeleteOptions;
-        // random: Nat64;
     };
 
     public func delete(guid: GUID.GUID, options: DeleteOptions): async* () {
@@ -127,7 +135,7 @@ module {
             OpsQueue.answer(
                 options.orderer.deleting,
                 guid,
-                await* deleteFinishByQueue(guid, elt));
+                await* deleteFinishByQueue(elt));
         });
 
         let deleting = switch (OpsQueue.get(options.orderer.deleting, guid)) {
@@ -141,12 +149,16 @@ module {
                 };
                 ignore BTree.insert(options.orderer.block, compareLocs, options.order.order, ());
                 ignore BTree.insert(options.orderer.block, compareLocs, options.order.reverse, ());
-                { options };
+                {
+                    options;
+                    guid1 = GUID.nextGuid(options.orderer.guidGen);
+                    guid2 = GUID.nextGuid(options.orderer.guidGen);
+                };
             };
         };
 
         try {
-            await* deleteFinishByQueue(guid, deleting);
+            await* deleteFinishByQueue(deleting);
         }
         catch(e) {
             OpsQueue.add(options.orderer.deleting, guid, deleting);
@@ -158,7 +170,7 @@ module {
         OpsQueue.result(orderer.deleting, guid);
     };
 
-    public func deleteFinishByQueue(guid: GUID.GUID, deleting: DeleteItem) : async* () {
+    public func deleteFinishByQueue(deleting: DeleteItem) : async* () {
         let key = await deleting.options.order.reverse.0.getByInner({
             innerKey = deleting.options.order.reverse.1;
             sk = encodeNat(deleting.options.value);
@@ -199,6 +211,9 @@ module {
     public type MoveItem = {
         options: MoveOptions;
         random: Nat64;
+        guid1: GUID.GUID;
+        guid2: GUID.GUID;
+        guid3: GUID.GUID;
     };
 
     public func move(guid: GUID.GUID, options: MoveOptions): async* () {
@@ -221,8 +236,13 @@ module {
                 ignore BTree.insert(options.orderer.block, compareLocs, options.order.order, ());
                 ignore BTree.insert(options.orderer.block, compareLocs, options.order.reverse, ());
 
-                let random = options.orderer.rng.next(); // should not generate this from GUID, to prevent user favoring his order
-                { options; random };
+                {
+                    options;
+                    random = options.orderer.rng.next();
+                    guid1 = GUID.nextGuid(options.orderer.guidGen);
+                    guid2 = GUID.nextGuid(options.orderer.guidGen);
+                    guid3 = GUID.nextGuid(options.orderer.guidGen);
+                };
             };
         };
 
@@ -250,13 +270,13 @@ module {
         };
         let newKeyText = encodeNat(moving.options.newKey);
 
-        let q1 = moving.options.index.insert(Blob.toArray(guid), {
+        let q1 = moving.options.index.insert(Blob.toArray(moving.guid1), {
             outerCanister = Principal.fromActor(moving.options.order.order.0);
             outerKey = moving.options.order.order.1;
             sk = newKeyText;
             value = #int(moving.options.value);
         });
-        let q2 = moving.options.index.insert(Blob.toArray(guid), {
+        let q2 = moving.options.index.insert(Blob.toArray(moving.guid2), {
             outerCanister = Principal.fromActor(moving.options.order.reverse.0);
             outerKey = moving.options.order.reverse.1;
             sk = newValueText;
@@ -265,7 +285,7 @@ module {
         ignore (await q1, await q2); // idempotent
         switch (oldKey) {
             case (?#text oldKeyText) {
-                await moving.options.index.delete(Blob.toArray(guid), {
+                await moving.options.index.delete(Blob.toArray(moving.guid3), {
                     outerCanister = Principal.fromActor(moving.options.order.order.0);
                     outerKey = moving.options.order.order.1;
                     sk = oldKeyText;
@@ -281,16 +301,66 @@ module {
         ignore BTree.delete(moving.options.orderer.block, compareLocs, moving.options.order.reverse);
     };
 
-    public func createOrder(index: Nac.IndexCanister, guid1: GUID.GUID, guid2: GUID.GUID): async* Order {
-        let order = (await index.createSubDB(Blob.toArray(guid1), {userData = ""})).outer;
-        let reverse = (await index.createSubDB(Blob.toArray(guid2), {userData = ""})).outer;
+    public type CreateOrderOptions = {
+        orderer: Orderer;
+    };
+
+    public type CreateOrderItem = {
+        options: CreateOrderOptions;
+        guid1: GUID.GUID;
+        guid2: GUID.GUID;
+        order: ?(Principal, Nac.OuterSubDBKey); // To increase performace, store `OuterCanister` instead.
+    };
+
+    public func createOrder(guid: GUID.GUID, options: CreateOrderOptions): async* Order {
+        ignore OpsQueue.whilePending(options.orderer.creatingOrder, func(guid: GUID.GUID, elt: CreateOrderItem): async* () {
+            OpsQueue.answer(
+                options.orderer.creatingOrder,
+                guid,
+                await* createOrderFinishByQueue(guid, elt));
+        });
+
+        let creatingOrder = switch (OpsQueue.get(options.orderer.creatingOrder, guid)) {
+            case (?moving) { moving };
+            case null {
+                {
+                    options;
+                    guid1 = GUID.nextGuid(options.orderer.guidGen);
+                    guid2 = GUID.nextGuid(options.orderer.guidGen);
+                    order = null;
+                };
+            };
+        };
+
+        try {
+            await* createOrderFinishByQueue(guid, creatingOrder);
+        }
+        catch(e) {
+            OpsQueue.add(options.orderer.creatingOrder, guid, creatingOrder);
+            throw e;
+        };
+    };
+
+    public func createOrderFinish(guid: GUID.GUID, orderer: Orderer) : async* ?Order {
+        OpsQueue.result(orderer.creatingOrder, guid);
+    };
+
+    // I run promises in order, rather than paralelly, to ensure they are executed once.
+    public func createOrderFinishByQueue(guid: GUID.GUID, creatingOrder: CreateOrderItem) : async* Order {
+        let order = switch(creatingOrder.order) {
+            case (?order) { order };
+            case null {
+                (await creatingOrder.options.orderer.index.createSubDB(Blob.toArray(creatingOrder.guid1), {userData = ""})).outer;
+            }
+        };
+        let reverse = (await creatingOrder.options.orderer.index.createSubDB(Blob.toArray(creatingOrder.guid2), {userData = ""})).outer;
         {
             order = (actor(Principal.toText(order.0)), order.1);
             reverse = (actor(Principal.toText(reverse.0)), reverse.1);
         };
     };
 
-    // TODO: duplicate code with `zondirectory2` repo
+   // TODO: duplicate code with `zondirectory2` repo
 
     func _toLowerHexDigit(v: Nat): Char {
         Char.fromNat32(Nat32.fromNat(
