@@ -20,7 +20,7 @@ import BTree "mo:btree/BTree";
 
 module {
     public type Orderer = {
-        var rng: Prng.Seiran128; // FIXME: Is 64 bits enough?
+        var rng: Prng.Seiran128; // 64 bits seems enough (https://stackoverflow.com/a/22029380/856090)
         // guidGen: GUID.GUIDGenerator;
         adding: OpsQueue.OpsQueue<AddItem, ()>;
         deleting: OpsQueue.OpsQueue<DeleteItem, ()>;
@@ -35,7 +35,9 @@ module {
         reverse: (Nac.OuterCanister, Nac.OuterSubDBKey); // Value -> Key#random
     };
 
-    type AddOptions = {
+    // FIXME: Below I use the same GUID more than once. That's an error.
+
+    public type AddOptions = {
         index: Nac.IndexCanister;
         orderer: Orderer;
         order: Order;
@@ -43,7 +45,7 @@ module {
         value: Nat;
     };
 
-    type AddItem = {
+    public type AddItem = {
         options: AddOptions;
         random: Nat64;
     };
@@ -88,7 +90,7 @@ module {
         OpsQueue.result(orderer.adding, guid);
     };
 
-    func addFinishByQueue(guid: GUID.GUID, adding: AddItem) : async* () {
+    public func addFinishByQueue(guid: GUID.GUID, adding: AddItem) : async* () {
         let key2 = encodeNat(adding.options.key) # encodeNat64(adding.random);
         let q1 = adding.options.index.insert(Blob.toArray(guid), {
             outerCanister = Principal.fromActor(adding.options.order.order.0);
@@ -108,14 +110,14 @@ module {
         ignore BTree.delete(adding.options.orderer.block, compareLocs, adding.options.order.reverse);
     };
 
-    type DeleteOptions = {
+    public type DeleteOptions = {
         index: Nac.IndexCanister;
         orderer: Orderer;
         order: Order;
         value: Nat;
     };
 
-    type DeleteItem = {
+    public type DeleteItem = {
         options: DeleteOptions;
         // random: Nat64;
     };
@@ -156,7 +158,7 @@ module {
         OpsQueue.result(orderer.deleting, guid);
     };
 
-    func deleteFinishByQueue(guid: GUID.GUID, deleting: DeleteItem) : async* () {
+    public func deleteFinishByQueue(guid: GUID.GUID, deleting: DeleteItem) : async* () {
         let key = await deleting.options.order.reverse.0.getByInner({
             innerKey = deleting.options.order.reverse.1;
             sk = encodeNat(deleting.options.value);
@@ -186,7 +188,7 @@ module {
     };
 
     /// Move value to new key.
-    type MoveOptions = {
+    public type MoveOptions = {
         index: Nac.IndexCanister;
         orderer: Orderer;
         order: Order;
@@ -194,7 +196,7 @@ module {
         value: Nat;
     };
 
-    type MoveItem = {
+    public type MoveItem = {
         options: MoveOptions;
         random: Nat64;
     };
@@ -237,7 +239,7 @@ module {
         OpsQueue.result(orderer.moving, guid);
     };
 
-    func moveFinishByQueue(guid: GUID.GUID, moving: MoveItem) : async* () {
+    public func moveFinishByQueue(guid: GUID.GUID, moving: MoveItem) : async* () {
         let newValueText = encodeNat(moving.options.value);
         let oldKey = await moving.options.order.reverse.0.getByInner({
             innerKey = moving.options.order.reverse.1;
@@ -277,6 +279,15 @@ module {
 
         ignore BTree.delete(moving.options.orderer.block, compareLocs, moving.options.order.order);
         ignore BTree.delete(moving.options.orderer.block, compareLocs, moving.options.order.reverse);
+    };
+
+    public func createOrder(index: Nac.IndexCanister, guid1: GUID.GUID, guid2: GUID.GUID): async* Order {
+        let order = (await index.createSubDB(Blob.toArray(guid1), {userData = ""})).outer;
+        let reverse = (await index.createSubDB(Blob.toArray(guid2), {userData = ""})).outer;
+        {
+            order = (actor(Principal.toText(order.0)), order.1);
+            reverse = (actor(Principal.toText(reverse.0)), reverse.1);
+        };
     };
 
     // TODO: duplicate code with `zondirectory2` repo

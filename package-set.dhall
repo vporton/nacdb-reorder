@@ -56,6 +56,11 @@ let
       , repo = "https://github.com/enzoh/motoko-sha"
       , dependencies = [ "base" ]
       },
+      { name = "matchers"
+      , version = "master"
+      , repo = "https://github.com/kritzcreek/motoko-matchers"
+      , dependencies = [ "base" ]
+      },
     ] : List Package
 
 let
