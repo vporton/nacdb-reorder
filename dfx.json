@@ -1,14 +1,23 @@
 {
   "canisters": {
     "NacDBReorder_test": {
-      "main": "src/test/main.mo",
+      "main": "test/main.mo",
+      "type": "motoko",
+      "dependencies": ["index"]
+    },
+    "index": {
+      "main": "test/index/main.mo",
+      "type": "motoko"
+    },
+    "partition": {
+      "main": "test/partition/main.mo",
       "type": "motoko"
     }
   },
   "defaults": {
     "build": {
       "args": "",
-      "packtool": ""
+      "packtool": "vessel sources"
     }
   },
   "output_env_file": ".env",

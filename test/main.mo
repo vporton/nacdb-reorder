@@ -5,13 +5,16 @@ import T "mo:matchers/Testable";
 import Suite "mo:matchers/Suite";
 import Order "mo:base/Order";
 import Index "index/main";
+import MyCycles "mo:nacdb/Cycles";
+import GUID "mo:nacdb/GUID";
+import Common "common";
 
 let index = await Index.Index();
-MyCycles.addPart(dbOptions.partitionCycles);
+MyCycles.addPart(Common.dbOptions.partitionCycles);
 await index.init();
 
-func prepareOrder(): async* RO.Order {
-    RO.createOrder(index: Nac.IndexCanister, guid1: GUID.GUID, guid2: GUID.GUID)
+func prepareOrder(orderer: RO.Orderer): async* RO.Order {
+    RO.createOrder(guid, {orderer})
 };
 
 func main() {

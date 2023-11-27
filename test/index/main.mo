@@ -8,7 +8,7 @@ import Blob "mo:base/Blob";
 import Array "mo:base/Array";
 import Iter "mo:base/Iter";
 import Result "mo:base/Result";
-import MyCycles "../../../src/Cycles";
+import MyCycles "mo:nacdb/Cycles";
 import Common "../common";
 
 shared actor class Index() = this {

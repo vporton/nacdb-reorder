@@ -22,7 +22,7 @@ import BTree "mo:btree/BTree";
 module {
     public type Orderer = {
         index: Nac.IndexCanister;
-        var rng: Prng.Seiran128; // 64 bits seems enough (https://stackoverflow.com/a/22029380/856090)
+        var rng: Prng.Seiran128; // 64 bits seems enough (https://stackoverflow.com/a/22029380/856090) // TODO
         guidGen: GUID.GUIDGenerator;
         adding: OpsQueue.OpsQueue<AddItem, ()>;
         deleting: OpsQueue.OpsQueue<DeleteItem, ()>;

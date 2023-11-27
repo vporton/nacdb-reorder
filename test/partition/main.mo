@@ -1,10 +1,10 @@
 import I "mo:base/Iter";
 import BTree "mo:btree/BTree";
-import Nac "../../../src/NacDB";
+import Nac "mo:nacdb/NacDB";
 import Principal "mo:base/Principal";
 import Bool "mo:base/Bool";
 import Nat "mo:base/Nat";
-import MyCycles "../../../src/Cycles";
+import MyCycles "mo:nacdb/Cycles";
 import Text "mo:base/Text";
 import Debug "mo:base/Debug";
 import Blob "mo:base/Blob";
