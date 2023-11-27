@@ -1,9 +1,16 @@
-import RO "../Reorder";
+import RO "../src/Reorder";
+import Nac "mo:nacdb/NacDB";
 import M "mo:matchers/Matchers";
 import T "mo:matchers/Testable";
 import Suite "mo:matchers/Suite";
+import Order "mo:base/Order";
+import Index "index/main";
 
-func prepareOrder() {
+let index = await Index.Index();
+MyCycles.addPart(dbOptions.partitionCycles);
+await index.init();
+
+func prepareOrder(): async* RO.Order {
     RO.createOrder(index: Nac.IndexCanister, guid1: GUID.GUID, guid2: GUID.GUID)
 };
 
