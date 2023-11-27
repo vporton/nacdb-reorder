@@ -14,7 +14,7 @@ MyCycles.addPart(Common.dbOptions.partitionCycles);
 await index.init();
 
 func prepareOrder(orderer: RO.Orderer): async* RO.Order {
-    RO.createOrder(guid, {orderer})
+    await* RO.createOrder(GUID.nextGuid(orderer.guidGen), {orderer});
 };
 
 func main() {

@@ -3,7 +3,6 @@ import OpsQueue "mo:nacdb/OpsQueue";
 import GUID "mo:nacdb/GUID";
 import Can "mo:candb/CanDB";
 import Entity "mo:candb/Entity";
-import Prng "mo:prng";
 import Nat64 "mo:base/Nat64";
 import Buffer "mo:base/Buffer";
 import Blob "mo:base/Blob";
@@ -22,7 +21,6 @@ import BTree "mo:btree/BTree";
 module {
     public type Orderer = {
         index: Nac.IndexCanister;
-        var rng: Prng.Seiran128; // 64 bits seems enough (https://stackoverflow.com/a/22029380/856090) // TODO
         guidGen: GUID.GUIDGenerator;
         adding: OpsQueue.OpsQueue<AddItem, ()>;
         deleting: OpsQueue.OpsQueue<DeleteItem, ()>;
@@ -50,7 +48,7 @@ module {
 
     public type AddItem = {
         options: AddOptions;
-        random: Nat64;
+        random: GUID.GUID;
         guid1: GUID.GUID;
         guid2: GUID.GUID;
     };
@@ -79,7 +77,7 @@ module {
 
                 {
                     options;
-                    random = options.orderer.rng.next();
+                    random = GUID.nextGuid(options.orderer.guidGen);
                     guid1 = GUID.nextGuid(options.orderer.guidGen);
                     guid2 = GUID.nextGuid(options.orderer.guidGen);
                 };
@@ -100,7 +98,7 @@ module {
     };
 
     public func addFinishByQueue(guid: GUID.GUID, adding: AddItem) : async* () {
-        let key2 = encodeNat(adding.options.key) # encodeNat64(adding.random);
+        let key2 = encodeNat(adding.options.key) # encodeBlob(adding.random);
         let q1 = adding.options.index.insert(Blob.toArray(adding.guid1), {
             outerCanister = Principal.fromActor(adding.options.order.order.0);
             outerKey = adding.options.order.order.1;
@@ -210,7 +208,7 @@ module {
 
     public type MoveItem = {
         options: MoveOptions;
-        random: Nat64;
+        random: GUID.GUID;
         guid1: GUID.GUID;
         guid2: GUID.GUID;
         guid3: GUID.GUID;
@@ -238,7 +236,7 @@ module {
 
                 {
                     options;
-                    random = options.orderer.rng.next();
+                    random = GUID.nextGuid(options.orderer.guidGen); // FIXME: It seems unused
                     guid1 = GUID.nextGuid(options.orderer.guidGen);
                     guid2 = GUID.nextGuid(options.orderer.guidGen);
                     guid3 = GUID.nextGuid(options.orderer.guidGen);
