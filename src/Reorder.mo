@@ -29,14 +29,24 @@ module {
         block: BTree.BTree<(Nac.OuterCanister, Nac.OuterSubDBKey), ()>;
     };
 
+    public func createOrderer(index: Nac.IndexCanister): Orderer {
+        {
+            index;
+            guidGen = GUID.init(Array.tabulate<Nat8>(16, func _ = 0));
+            adding = OpsQueue.init(10); // FIXME: fixed number of entries
+            deleting = OpsQueue.init(10);
+            moving = OpsQueue.init(10);
+            creatingOrder = OpsQueue.init(10);
+            block = BTree.init(null);
+        };
+    };
+
     /// Keys may be duplicated, but all values are distinct.
     public type Order = {
         // A random string is added to a key in order to ensure key are unique.
         order: (Nac.OuterCanister, Nac.OuterSubDBKey); // Key#random -> Value.
         reverse: (Nac.OuterCanister, Nac.OuterSubDBKey); // Value -> Key#random
     };
-
-    // FIXME: Below I use the same GUID more than once. That's an error.
 
     public type AddOptions = {
         index: Nac.IndexCanister;

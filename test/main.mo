@@ -9,20 +9,24 @@ import MyCycles "mo:nacdb/Cycles";
 import GUID "mo:nacdb/GUID";
 import Common "common";
 
-let index = await Index.Index();
-MyCycles.addPart(Common.dbOptions.partitionCycles);
-await index.init();
+actor Test {
+    public func main() {
+        let index = await Index.Index();
+        MyCycles.addPart(Common.dbOptions.partitionCycles);
+        await index.init();
 
-func prepareOrder(orderer: RO.Orderer): async* RO.Order {
-    await* RO.createOrder(GUID.nextGuid(orderer.guidGen), {orderer});
-};
+        let orderer = RO.createOrderer(index);
 
-func main() {
-    let suite = Suite.suite("Reorder test", [
-        Suite.suite("Nat tests", [
-            Suite.test("10 is 10", 10, M.equals(T.nat(10))),
-            Suite.test("5 is greater than three", 5, M.greaterThan<Nat>(3)),
-        ])
-    ]);
-    Suite.run(suite);
-};
+        func prepareOrder(orderer: RO.Orderer): async* RO.Order {
+            await* RO.createOrder(GUID.nextGuid(orderer.guidGen), {orderer});
+        };
+
+        let suite = Suite.suite("Reorder test", [
+            Suite.suite("Nat tests", [
+                Suite.test("10 is 10", 10, M.equals(T.nat(10))),
+                Suite.test("5 is greater than three", 5, M.greaterThan<Nat>(3)),
+            ])
+        ]);
+        Suite.run(suite);
+    };
+}
