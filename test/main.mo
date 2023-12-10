@@ -29,7 +29,6 @@ actor Test {
             order;
         };
 
-        Debug.print("[[[");
         let suite = Suite.suite("Reorder test", [
             Suite.suite("Nat tests", [
                 Suite.test("10 is 10", 10, M.equals(T.nat(11))),
@@ -37,6 +36,5 @@ actor Test {
             ])
         ]);
         Suite.run(suite);
-        Debug.print("]]]");
    };
 }
