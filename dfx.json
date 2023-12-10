@@ -16,7 +16,7 @@
   },
   "defaults": {
     "build": {
-      "args": "",
+      "args": "-fshared-code",
       "packtool": "vessel sources"
     }
   },
