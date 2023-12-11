@@ -45,7 +45,7 @@ actor Test {
             for (i in Iter.range(0, 2)) {
                 await* Reorder.add(GUID.nextGuid(guidGen), {
                     index;
-                    key = i * (2**64);
+                    key = i * (2**32);
                     order;
                     orderer;
                     value = i * 10;
@@ -60,7 +60,7 @@ actor Test {
                 index;
                 order;
                 orderer;
-                newKey = 2 * (2**64) + (2**63);
+                newKey = 2 * (2**32) + (2**31);
                 value = 10;
             });
             order;
