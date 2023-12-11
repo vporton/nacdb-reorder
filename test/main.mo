@@ -66,8 +66,20 @@ actor Test {
             order;
         };
 
+        func moveBackwardOrder(orderer: RO.Orderer): async* RO.Order {
+            let order = await* prepareOrder(orderer);
+            await* Reorder.move(GUID.nextGuid(guidGen), {
+                index;
+                order;
+                orderer;
+                newKey = -(2**31);
+                value = 10;
+            });
+            order;
+        };
+
         let suite = Suite.suite("Reorder test", [
-            Suite.suite("Changed order tests", do {
+            Suite.suite("Move forward test", do {
                 let order1 = await* moveForwardOrder(orderer);
                 let results = await order1.order.0.scanLimitOuter({
                     outerKey = order1.order.1;
@@ -85,7 +97,26 @@ actor Test {
                 [
                     Suite.test("move element forward", Iter.toArray(results2), M.equals(myArray([0, 20, 10]))),
                 ];
-            })
+            }),
+            Suite.suite("Move backward test", do {
+                let order1 = await* moveBackwardOrder(orderer);
+                let results = await order1.order.0.scanLimitOuter({
+                    outerKey = order1.order.1;
+                    lowerBound = "";
+                    upperBound = "zz";
+                    dir = #fwd;
+                    limit = 1000;
+                });
+                let results2 = Iter.map<(Text, Nac.AttributeValue), Int>(Array.vals(results.results), func((k, v): (Text, Nac.AttributeValue)) {
+                    let #int v2 = v else {
+                        Debug.trap("programming error");
+                    };
+                    v2;
+                });
+                [
+                    Suite.test("move element forward", Iter.toArray(results2), M.equals(myArray([10, 0, 20]))),
+                ];
+            }),
         ]);
         Suite.run(suite);
    };

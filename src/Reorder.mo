@@ -53,7 +53,7 @@ module {
         index: Nac.IndexCanister;
         orderer: Orderer;
         order: Order;
-        key: Nac.OuterSubDBKey;
+        key: Int;
         value: Int;
     };
 
@@ -214,7 +214,7 @@ module {
         orderer: Orderer;
         order: Order;
         value: Int;
-        newKey: Nac.OuterSubDBKey;
+        newKey: Int;
     };
 
     public type MoveItem = {
