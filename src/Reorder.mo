@@ -371,7 +371,7 @@ module {
 
    // TODO: duplicate code with `zondirectory2` repo
 
-    func _toLowerHexDigit(v: Int): Char {
+    func _toLowerHexDigit(v: Nat): Char {
         Char.fromNat32(Nat32.fromNat(
             if (v < 10) {
                 Nat32.toNat(Char.toNat32('0')) + v;
