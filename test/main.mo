@@ -15,6 +15,17 @@ import Common "common";
 import Reorder "../src/Reorder";
 
 actor Test {
+    let myArrayTestable : T.Testable<[Int]> = {
+        display = func(a : [Int]) : Text = debug_show(a);
+        equals = func(n1 : [Int], n2 : [Int]) : Bool = n1 == n2;
+    };
+
+    func myArray(n : [Int]) : T.TestableItem<[Int]> = {
+        item = n;
+        display = myArrayTestable.display;
+        equals = myArrayTestable.equals;
+    };
+
     public func main(): async () {
         MyCycles.addPart(Common.dbOptions.partitionCycles);
         let index = await Index.Index();
@@ -49,17 +60,32 @@ actor Test {
                 index;
                 order;
                 orderer;
-                newKey = 3 * (2**64);
-                value = 10; // FIXME
+                newKey = 2 * (2**64) + (2**63);
+                value = 10;
             });
             order;
         };
 
         let suite = Suite.suite("Reorder test", [
-            Suite.suite("Nat tests", [
-                Suite.test("10 is 10", 10, M.equals(T.nat(11))),
-                Suite.test("5 is greater than three", 5, M.greaterThan<Nat>(3)),
-            ])
+            Suite.suite("Changed order tests", do {
+                let order1 = await* moveForwardOrder(orderer);
+                let results = await order1.order.0.scanLimitOuter({
+                    outerKey = order1.order.1;
+                    lowerBound = "";
+                    upperBound = "zz";
+                    dir = #fwd;
+                    limit = 1000;
+                });
+                let results2 = Iter.map<(Text, Nac.AttributeValue), Int>(Array.vals(results.results), func((k, v): (Text, Nac.AttributeValue)) {
+                    let #int v2 = v else {
+                        Debug.trap("programming error");
+                    };
+                    v2;
+                });
+                [
+                    Suite.test("move element forward", Iter.toArray(results2), M.equals(myArray([0, 20, 10]))),
+                ];
+            })
         ]);
         Suite.run(suite);
    };

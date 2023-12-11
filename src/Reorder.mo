@@ -212,8 +212,8 @@ module {
         index: Nac.IndexCanister;
         orderer: Orderer;
         order: Order;
-        newKey: Nac.OuterSubDBKey;
         value: Nat;
+        newKey: Nac.OuterSubDBKey;
     };
 
     public type MoveItem = {
