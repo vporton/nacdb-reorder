@@ -16,6 +16,7 @@ import Principal "mo:base/Principal";
 import Nat "mo:base/Nat";
 import Debug "mo:base/Debug";
 import Order "mo:base/Order";
+import Int "mo:base/Int";
 import BTree "mo:btree/BTree";
 
 module {
@@ -53,7 +54,7 @@ module {
         orderer: Orderer;
         order: Order;
         key: Nac.OuterSubDBKey;
-        value: Nat;
+        value: Int;
     };
 
     public type AddItem = {
@@ -108,7 +109,7 @@ module {
     };
 
     public func addFinishByQueue(guid: GUID.GUID, adding: AddItem) : async* () {
-        let key2 = encodeNat(adding.options.key) # encodeBlob(adding.random);
+        let key2 = encodeInt(adding.options.key) # encodeBlob(adding.random);
         let q1 = adding.options.index.insert(Blob.toArray(adding.guid1), {
             outerCanister = Principal.fromActor(adding.options.order.order.0);
             outerKey = adding.options.order.order.1;
@@ -118,7 +119,7 @@ module {
         let q2 = adding.options.index.insert(Blob.toArray(adding.guid2), {
             outerCanister = Principal.fromActor(adding.options.order.reverse.0);
             outerKey = adding.options.order.reverse.1;
-            sk = encodeNat(adding.options.value);
+            sk = encodeInt(adding.options.value);
             value = #text key2;
         });
         ignore (await q1, await q2); // idempotent
@@ -131,7 +132,7 @@ module {
         index: Nac.IndexCanister;
         orderer: Orderer;
         order: Order;
-        value: Nat;
+        value: Int;
     };
 
     public type DeleteItem = {
@@ -181,7 +182,7 @@ module {
     public func deleteFinishByQueue(deleting: DeleteItem) : async* () {
         let key = await deleting.options.order.reverse.0.getByInner({
             innerKey = deleting.options.order.reverse.1;
-            sk = encodeNat(deleting.options.value);
+            sk = encodeInt(deleting.options.value);
         });
 
         // The order of two following statements is essential:
@@ -200,7 +201,7 @@ module {
 
         await deleting.options.order.reverse.0.deleteInner({
             innerKey = deleting.options.order.reverse.1;
-            sk = encodeNat(deleting.options.value);
+            sk = encodeInt(deleting.options.value);
         });
 
         ignore BTree.delete(deleting.options.orderer.block, compareLocs, deleting.options.order.order);
@@ -212,7 +213,7 @@ module {
         index: Nac.IndexCanister;
         orderer: Orderer;
         order: Order;
-        value: Nat;
+        value: Int;
         newKey: Nac.OuterSubDBKey;
     };
 
@@ -268,7 +269,7 @@ module {
     };
 
     public func moveFinishByQueue(guid: GUID.GUID, moving: MoveItem) : async* () {
-        let newValueText = encodeNat(moving.options.value);
+        let newValueText = encodeInt(moving.options.value);
         let oldKey = await moving.options.order.reverse.0.getByInner({
             innerKey = moving.options.order.reverse.1;
             sk = newValueText;
@@ -276,7 +277,7 @@ module {
         if (?#int(moving.options.newKey) == oldKey) {
             return;
         };
-        let newKeyText = encodeNat(moving.options.newKey);
+        let newKeyText = encodeInt(moving.options.newKey);
 
         let q1 = moving.options.index.insert(Blob.toArray(moving.guid1), {
             outerCanister = Principal.fromActor(moving.options.order.order.0);
@@ -370,7 +371,7 @@ module {
 
    // TODO: duplicate code with `zondirectory2` repo
 
-    func _toLowerHexDigit(v: Nat): Char {
+    func _toLowerHexDigit(v: Int): Char {
         Char.fromNat32(Nat32.fromNat(
             if (v < 10) {
                 Nat32.toNat(Char.toNat32('0')) + v;
@@ -402,6 +403,16 @@ module {
 
     public func encodeNat(n: Nat): Text {
         encodeNat64(Nat64.fromNat(n));
+    };
+
+    // For integers less than 2**64 have the same lexigraphical sort order as the argument.
+    public func encodeInt(n: Int): Text {
+        assert n < 2**64;
+        if (n >= 0) {
+            encodeNat(Int.abs(n));
+        } else {
+            "-" # encodeNat(2**64 - Int.abs(n));
+        };
     };
 
     func comparePartition(x: Nac.PartitionCanister, y: Nac.PartitionCanister): {#equal; #greater; #less} {
