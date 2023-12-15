@@ -15,12 +15,12 @@ import Common "common";
 import Reorder "../src/Reorder";
 
 actor Test {
-    let myArrayTestable : T.Testable<[Int]> = {
-        display = func(a : [Int]) : Text = debug_show(a);
-        equals = func(n1 : [Int], n2 : [Int]) : Bool = n1 == n2;
+    let myArrayTestable : T.Testable<[Text]> = {
+        display = func(a : [Text]) : Text = debug_show(a);
+        equals = func(n1 : [Text], n2 : [Text]) : Bool = n1 == n2;
     };
 
-    func myArray(n : [Int]) : T.TestableItem<[Int]> = {
+    func myArray(n : [Text]) : T.TestableItem<[Text]> = {
         item = n;
         display = myArrayTestable.display;
         equals = myArrayTestable.equals;
@@ -48,7 +48,7 @@ actor Test {
                     key = i * (2**32);
                     order;
                     orderer;
-                    value = i * 10;
+                    value = Reorder.encodeInt(i * 10);
                 });
             };
             order;
@@ -61,7 +61,7 @@ actor Test {
                 order;
                 orderer;
                 newKey = 2 * (2**32) + (2**31);
-                value = 10;
+                value = Reorder.encodeInt(10);
             });
             order;
         };
@@ -73,7 +73,7 @@ actor Test {
                 order;
                 orderer;
                 newKey = -(2**31);
-                value = 10;
+                value = Reorder.encodeInt(10);
             });
             order;
         };
@@ -88,14 +88,15 @@ actor Test {
                     dir = #fwd;
                     limit = 1000;
                 });
-                let results2 = Iter.map<(Text, Nac.AttributeValue), Int>(Array.vals(results.results), func((k, v): (Text, Nac.AttributeValue)) {
-                    let #int v2 = v else {
+                let results2 = Iter.map<(Text, Nac.AttributeValue), Text>(Array.vals(results.results), func((k, v): (Text, Nac.AttributeValue)) {
+                    let #text v2 = v else {
                         Debug.trap("programming error");
                     };
                     v2;
                 });
                 [
-                    Suite.test("move element forward", Iter.toArray(results2), M.equals(myArray([0, 20, 10]))),
+                    Suite.test("move element forward", Iter.toArray(results2), M.equals(
+                        myArray([Reorder.encodeInt(0), Reorder.encodeInt(20), Reorder.encodeInt(10)]))),
                 ];
             }),
             Suite.suite("Move backward test", do {
@@ -107,14 +108,15 @@ actor Test {
                     dir = #fwd;
                     limit = 1000;
                 });
-                let results2 = Iter.map<(Text, Nac.AttributeValue), Int>(Array.vals(results.results), func((k, v): (Text, Nac.AttributeValue)) {
-                    let #int v2 = v else {
+                let results2 = Iter.map<(Text, Nac.AttributeValue), Text>(Array.vals(results.results), func((k, v): (Text, Nac.AttributeValue)) {
+                    let #text v2 = v else {
                         Debug.trap("programming error");
                     };
                     v2;
                 });
                 [
-                    Suite.test("move element forward", Iter.toArray(results2), M.equals(myArray([10, 0, 20]))),
+                    Suite.test("move element forward", Iter.toArray(results2), M.equals(
+                        myArray([Reorder.encodeInt(10), Reorder.encodeInt(0), Reorder.encodeInt(20)]))),
                 ];
             }),
         ]);

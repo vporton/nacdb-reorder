@@ -54,7 +54,7 @@ module {
         orderer: Orderer;
         order: Order;
         key: Int;
-        value: Int;
+        value: Text;
     };
 
     public type AddItem = {
@@ -114,12 +114,12 @@ module {
             outerCanister = Principal.fromActor(adding.options.order.order.0);
             outerKey = adding.options.order.order.1;
             sk = key2;
-            value = #int(adding.options.value);
+            value = #text(adding.options.value);
         });
         let q2 = adding.options.index.insert(Blob.toArray(adding.guid2), {
             outerCanister = Principal.fromActor(adding.options.order.reverse.0);
             outerKey = adding.options.order.reverse.1;
-            sk = encodeInt(adding.options.value);
+            sk = adding.options.value;
             value = #text key2;
         });
         ignore (await q1, await q2); // idempotent
@@ -132,7 +132,7 @@ module {
         index: Nac.IndexCanister;
         orderer: Orderer;
         order: Order;
-        value: Int;
+        value: Text;
     };
 
     public type DeleteItem = {
@@ -182,7 +182,7 @@ module {
     public func deleteFinishByQueue(deleting: DeleteItem) : async* () {
         let key = await deleting.options.order.reverse.0.getByInner({
             innerKey = deleting.options.order.reverse.1;
-            sk = encodeInt(deleting.options.value);
+            sk = deleting.options.value;
         });
 
         // The order of two following statements is essential:
@@ -201,7 +201,7 @@ module {
 
         await deleting.options.order.reverse.0.deleteInner({
             innerKey = deleting.options.order.reverse.1;
-            sk = encodeInt(deleting.options.value);
+            sk = deleting.options.value;
         });
 
         ignore BTree.delete(deleting.options.orderer.block, compareLocs, deleting.options.order.order);
@@ -213,7 +213,7 @@ module {
         index: Nac.IndexCanister;
         orderer: Orderer;
         order: Order;
-        value: Int;
+        value: Text;
         newKey: Int;
     };
 
@@ -269,7 +269,7 @@ module {
     };
 
     public func moveFinishByQueue(guid: GUID.GUID, moving: MoveItem) : async* () {
-        let newValueText = encodeInt(moving.options.value);
+        let newValueText = moving.options.value;
         let oldKey = await moving.options.order.reverse.0.getByInner({
             innerKey = moving.options.order.reverse.1;
             sk = newValueText;
@@ -283,7 +283,7 @@ module {
             outerCanister = Principal.fromActor(moving.options.order.order.0);
             outerKey = moving.options.order.order.1;
             sk = newKeyText;
-            value = #int(moving.options.value);
+            value = #text(moving.options.value);
         });
         let q2 = moving.options.index.insert(Blob.toArray(moving.guid2), {
             outerCanister = Principal.fromActor(moving.options.order.reverse.0);
