@@ -109,7 +109,7 @@ module {
     };
 
     public func addFinishByQueue(guid: GUID.GUID, adding: AddItem) : async* () {
-        let key2 = encodeInt(adding.options.key) # encodeBlob(adding.random);
+        let key2 = encodeInt(adding.options.key) # "#" # encodeBlob(adding.random);
         let q1 = adding.options.index.insert(Blob.toArray(adding.guid1), {
             outerCanister = Principal.fromActor(adding.options.order.order.0);
             outerKey = adding.options.order.order.1;
