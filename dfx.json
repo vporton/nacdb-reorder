@@ -3,7 +3,9 @@
     "NacDBReorder_test": {
       "main": "test/main.mo",
       "type": "motoko",
-      "dependencies": ["index"]
+      "dependencies": [
+        "index"
+      ]
     },
     "index": {
       "main": "test/index/main.mo",
@@ -17,7 +19,7 @@
   "defaults": {
     "build": {
       "args": "-fshared-code",
-      "packtool": "vessel sources"
+      "packtool": "mops sources"
     }
   },
   "output_env_file": ".env",
