@@ -17,7 +17,7 @@ import Nat "mo:base/Nat";
 import Debug "mo:base/Debug";
 import Order "mo:base/Order";
 import Int "mo:base/Int";
-import BTree "mo:btree/BTree";
+import BTree "mo:stableheapbtreemap/BTree";
 
 module {
     public type Orderer = {
