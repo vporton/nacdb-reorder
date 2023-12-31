@@ -42,7 +42,7 @@ actor Test {
         let orderer = RO.createOrderer(index);
 
         func createOrder(orderer: RO.Orderer): async* RO.Order {
-            await* RO.createOrder(GUID.nextGuid(orderer.guidGen), {orderer});
+            await* RO.createOrder(GUID.nextGuid(orderer.guidGen), orderer);
         };
 
         let guidGen = GUID.init(Array.tabulate<Nat8>(16, func _ = 0));
@@ -50,11 +50,10 @@ actor Test {
         func prepareOrder(orderer: RO.Orderer): async* RO.Order {
             let order = await* createOrder(orderer);
             for (i in Iter.range(0, 2)) {
-                await* Reorder.add(GUID.nextGuid(guidGen), {
+                await* Reorder.add(GUID.nextGuid(guidGen), orderer, {
                     index;
                     key = i * (2**32);
                     order;
-                    orderer;
                     value = encodeInt(i * 10);
                 });
             };
@@ -63,10 +62,9 @@ actor Test {
 
         func moveForwardOrder(orderer: RO.Orderer): async* RO.Order {
             let order = await* prepareOrder(orderer);
-            await* Reorder.move(GUID.nextGuid(guidGen), {
+            await* Reorder.move(GUID.nextGuid(guidGen), orderer, {
                 index;
                 order;
-                orderer;
                 relative = false;
                 newKey = 2 * (2**32) + (2**31);
                 value = encodeInt(10);
@@ -76,10 +74,9 @@ actor Test {
 
         func moveBackwardOrder(orderer: RO.Orderer): async* RO.Order {
             let order = await* prepareOrder(orderer);
-            await* Reorder.move(GUID.nextGuid(guidGen), {
+            await* Reorder.move(GUID.nextGuid(guidGen), orderer, {
                 index;
                 order;
-                orderer;
                 relative = false;
                 newKey = -(2**31);
                 value = encodeInt(10);
@@ -89,10 +86,9 @@ actor Test {
 
         func moveForwardRelativeOrder(orderer: RO.Orderer): async* RO.Order {
             let order = await* prepareOrder(orderer);
-            await* Reorder.move(GUID.nextGuid(guidGen), {
+            await* Reorder.move(GUID.nextGuid(guidGen), orderer, {
                 index;
                 order;
-                orderer;
                 relative = true;
                 newKey = 10 * (2**32) + (2**31);
                 value = encodeInt(10);
@@ -102,10 +98,9 @@ actor Test {
 
         func moveBackwardRelativeOrder(orderer: RO.Orderer): async* RO.Order {
             let order = await* prepareOrder(orderer);
-            await* Reorder.move(GUID.nextGuid(guidGen), {
+            await* Reorder.move(GUID.nextGuid(guidGen), orderer, {
                 index;
                 order;
-                orderer;
                 relative = true;
                 newKey = 10 * -(2**31);
                 value = encodeInt(10);
