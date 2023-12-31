@@ -218,23 +218,8 @@ module {
         orderer: Orderer;
         order: Order;
         value: Text;
-        updateKey: (oldKey: Text) -> Int;
-    };
-
-    public type MoveOptionsSimple = {
-        index: Nac.IndexCanister;
-        orderer: Orderer;
-        order: Order;
-        value: Text;
+        relative: Bool;
         newKey: Int;
-    };
-
-    public type MoveOptionsRelative = {
-        index: Nac.IndexCanister;
-        orderer: Orderer;
-        order: Order;
-        value: Text;
-        keyDiff: Int;
     };
 
     public type MoveItem = {
@@ -245,7 +230,7 @@ module {
         guid3: GUID.GUID;
     };
 
-    public func moveGeneral(guid: GUID.GUID, options: MoveOptions): async* () {
+    public func move(guid: GUID.GUID, options: MoveOptions): async* () {
         ignore OpsQueue.whilePending(options.orderer.moving, func(guid: GUID.GUID, elt: MoveItem): async* () {
             OpsQueue.answer(
                 options.orderer.moving,
@@ -284,26 +269,6 @@ module {
         };
     };
 
-    public func move(guid: GUID.GUID, options: MoveOptionsSimple): async* () {
-        await* moveGeneral(guid, {
-            index = options.index;
-            orderer = options.orderer;
-            order = options.order;
-            value = options.value;
-            updateKey = func(_) = options.newKey;
-        });
-    };
-
-    public func moveRelative(guid: GUID.GUID, options: MoveOptionsRelative): async* () {
-        await* moveGeneral(guid, {
-            index = options.index;
-            orderer = options.orderer;
-            order = options.order;
-            value = options.value;
-            updateKey = func(old: Text): Int { decodeInt(old) + options.keyDiff };
-        });
-    };
-
     public func moveFinish(guid: GUID.GUID, orderer: Orderer) : async* ?() {
         OpsQueue.result(orderer.moving, guid);
     };
@@ -317,7 +282,12 @@ module {
         let newKey = switch (oldKey) {
             case (?#text oldKeyText) {
                 let oldKeyMainPart = Text.fromIter(Itertools.takeWhile(oldKeyText.chars(), func(c: Char): Bool { c != '#' }));
-                let newKey = moving.options.updateKey(oldKeyMainPart);
+                // TODO: Apparently superfluous decodeInt/encodeInt pair
+                let newKey = if (moving.options.relative) {
+                    decodeInt(oldKeyMainPart) + moving.options.newKey;
+                } else {
+                    moving.options.newKey;
+                };
                 if (encodeInt(newKey) == oldKeyMainPart) {
                     return;
                 };

@@ -1,4 +1,6 @@
 import RO "../src/Reorder";
+import Buffer "mo:base/Buffer";
+import Nat64 "mo:base/Nat64";
 import Nac "mo:nacdb/NacDB";
 import M "mo:matchers/Matchers";
 import T "mo:matchers/Testable";
@@ -8,6 +10,11 @@ import Debug "mo:base/Debug";
 import Blob "mo:base/Blob";
 import Array "mo:base/Array";
 import Iter "mo:base/Iter";
+import Nat8 "mo:base/Nat8";
+import Text "mo:base/Text";
+import Int "mo:base/Int";
+import Char "mo:base/Char";
+import Nat32 "mo:base/Nat32";
 import Index "index/main";
 import MyCycles "mo:nacdb/Cycles";
 import GUID "mo:nacdb/GUID";
@@ -48,7 +55,7 @@ actor Test {
                     key = i * (2**32);
                     order;
                     orderer;
-                    value = Reorder.encodeInt(i * 10);
+                    value = encodeInt(i * 10);
                 });
             };
             order;
@@ -60,8 +67,9 @@ actor Test {
                 index;
                 order;
                 orderer;
+                relative = false;
                 newKey = 2 * (2**32) + (2**31);
-                value = Reorder.encodeInt(10);
+                value = encodeInt(10);
             });
             order;
         };
@@ -72,32 +80,35 @@ actor Test {
                 index;
                 order;
                 orderer;
+                relative = false;
                 newKey = -(2**31);
-                value = Reorder.encodeInt(10);
+                value = encodeInt(10);
             });
             order;
         };
 
         func moveForwardRelativeOrder(orderer: RO.Orderer): async* RO.Order {
             let order = await* prepareOrder(orderer);
-            await* Reorder.moveRelative(GUID.nextGuid(guidGen), {
+            await* Reorder.move(GUID.nextGuid(guidGen), {
                 index;
                 order;
                 orderer;
-                keyDiff = 10 * (2**32) + (2**31);
-                value = Reorder.encodeInt(10);
+                relative = true;
+                newKey = 10 * (2**32) + (2**31);
+                value = encodeInt(10);
             });
             order;
         };
 
         func moveBackwardRelativeOrder(orderer: RO.Orderer): async* RO.Order {
             let order = await* prepareOrder(orderer);
-            await* Reorder.moveRelative(GUID.nextGuid(guidGen), {
+            await* Reorder.move(GUID.nextGuid(guidGen), {
                 index;
                 order;
                 orderer;
-                keyDiff = 10 * -(2**31);
-                value = Reorder.encodeInt(10);
+                relative = true;
+                newKey = 10 * -(2**31);
+                value = encodeInt(10);
             });
             order;
         };
@@ -120,7 +131,7 @@ actor Test {
                 });
                 [
                     Suite.test("move element forward", Iter.toArray(results2), M.equals(
-                        myArray([Reorder.encodeInt(0), Reorder.encodeInt(20), Reorder.encodeInt(10)]))),
+                        myArray([encodeInt(0), encodeInt(20), encodeInt(10)]))),
                 ];
             }),
             Suite.suite("Move backward test", do {
@@ -140,7 +151,7 @@ actor Test {
                 });
                 [
                     Suite.test("move element forward", Iter.toArray(results2), M.equals(
-                        myArray([Reorder.encodeInt(10), Reorder.encodeInt(0), Reorder.encodeInt(20)]))),
+                        myArray([encodeInt(10), encodeInt(0), encodeInt(20)]))),
                 ];
             }),
             Suite.suite("Move forward relative test", do {
@@ -160,7 +171,7 @@ actor Test {
                 });
                 [
                     Suite.test("move element forward", Iter.toArray(results2), M.equals(
-                        myArray([Reorder.encodeInt(0), Reorder.encodeInt(20), Reorder.encodeInt(10)]))),
+                        myArray([encodeInt(0), encodeInt(20), encodeInt(10)]))),
                 ];
             }),
             Suite.suite("Move backward relative test", do {
@@ -180,10 +191,54 @@ actor Test {
                 });
                 [
                     Suite.test("move element forward", Iter.toArray(results2), M.equals(
-                        myArray([Reorder.encodeInt(10), Reorder.encodeInt(0), Reorder.encodeInt(20)]))),
+                        myArray([encodeInt(10), encodeInt(0), encodeInt(20)]))),
                 ];
             }),
         ]);
         Suite.run(suite);
    };
+
+    func encodeBlob(g: Blob): Text {
+        var result = "";
+        for (b in g.vals()) {
+            let b2 = Nat8.toNat(b);
+            result #= Text.fromChar(_toLowerHexDigit(b2 / 16)) # Text.fromChar(_toLowerHexDigit(b2 % 16));
+        };
+        result;
+    };
+
+    func encodeNat64(n: Nat64): Text {
+        var n64 = n;
+        let buf = Buffer.Buffer<Nat8>(8);
+        for (i in Iter.range(0, 7)) {
+        buf.add(Nat8.fromNat(Nat64.toNat(n64 % 256)));
+           n64 >>= 8;
+        };
+        let blob = Blob.fromArray(Array.reverse(Buffer.toArray(buf)));
+        encodeBlob(blob);
+    };
+
+    func encodeNat(n: Nat): Text {
+        encodeNat64(Nat64.fromNat(n));
+    };
+
+    // For integers less than 2**64 have the same lexigraphical sort order as the argument.
+    func encodeInt(n: Int): Text {
+        assert n < 2**64;
+        if (n >= 0) {
+            encodeNat(Int.abs(n));
+        } else {
+            "-" # encodeNat(2**64 - Int.abs(n));
+        };
+    };
+
+    func _toLowerHexDigit(v: Nat): Char {
+        Char.fromNat32(Nat32.fromNat(
+            if (v < 10) {
+                Nat32.toNat(Char.toNat32('0')) + v;
+            } else {
+                Nat32.toNat(Char.toNat32('a')) + v - 10;
+            }
+        ));
+    };
 }
