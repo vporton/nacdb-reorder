@@ -39,10 +39,10 @@ actor Test {
         MyCycles.addPart(Common.dbOptions.partitionCycles);
         await index.init();
 
-        let orderer = RO.createOrderer(index);
+        let orderer = RO.createOrderer();
 
         func createOrder(orderer: RO.Orderer): async* RO.Order {
-            await* RO.createOrder(GUID.nextGuid(orderer.guidGen), orderer);
+            await* RO.createOrder(GUID.nextGuid(orderer.guidGen), index, orderer);
         };
 
         let guidGen = GUID.init(Array.tabulate<Nat8>(16, func _ = 0));

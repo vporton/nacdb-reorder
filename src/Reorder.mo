@@ -33,9 +33,8 @@ module {
         block: BTree.BTree<(Nac.OuterCanister, Nac.OuterSubDBKey), ()>;
     };
 
-    public func createOrderer(index: Nac.IndexCanister): Orderer {
+    public func createOrderer(): Orderer {
         {
-            index;
             guidGen = GUID.init(Array.tabulate<Nat8>(16, func _ = 0));
             adding = OpsQueue.init(10); // FIXME: fixed number of entries
             deleting = OpsQueue.init(10);
