@@ -25,7 +25,6 @@ import BTree "mo:stableheapbtreemap/BTree";
 
 module {
     public type Orderer = {
-        index: Nac.IndexCanister;
         guidGen: GUID.GUIDGenerator;
         adding: OpsQueue.OpsQueue<AddItem, ()>;
         deleting: OpsQueue.OpsQueue<DeleteItem, ()>;
@@ -330,12 +329,12 @@ module {
         order: ?(Principal, Nac.OuterSubDBKey); // To increase performace, store `OuterCanister` instead.
     };
 
-    public func createOrder(guid: GUID.GUID, orderer: Orderer): async* Order {
+    public func createOrder(guid: GUID.GUID, index: Nac.IndexCanister, orderer: Orderer): async* Order {
         ignore OpsQueue.whilePending(orderer.creatingOrder, func(guid: GUID.GUID, elt: CreateOrderItem): async* () {
             OpsQueue.answer(
                 orderer.creatingOrder,
                 guid,
-                await* createOrderFinishByQueue(guid, orderer, elt));
+                await* createOrderFinishByQueue(guid, index, orderer, elt));
         });
 
         let creatingOrder = switch (OpsQueue.get(orderer.creatingOrder, guid)) {
@@ -350,7 +349,7 @@ module {
         };
 
         try {
-            await* createOrderFinishByQueue(guid, orderer, creatingOrder);
+            await* createOrderFinishByQueue(guid, index, orderer, creatingOrder);
         }
         catch(e) {
             OpsQueue.add(orderer.creatingOrder, guid, creatingOrder);
@@ -363,14 +362,14 @@ module {
     };
 
     // I run promises in order, rather than paralelly, to ensure they are executed once.
-    public func createOrderFinishByQueue(guid: GUID.GUID, orderer: Orderer, creatingOrder: CreateOrderItem) : async* Order {
+    public func createOrderFinishByQueue(guid: GUID.GUID, index: Nac.IndexCanister, orderer: Orderer, creatingOrder: CreateOrderItem) : async* Order {
         let order = switch(creatingOrder.order) {
             case (?order) { order };
             case null {
-                (await orderer.index.createSubDB(Blob.toArray(creatingOrder.guid1), {userData = ""})).outer;
+                (await index.createSubDB(Blob.toArray(creatingOrder.guid1), {userData = ""})).outer;
             }
         };
-        let reverse = (await orderer.index.createSubDB(Blob.toArray(creatingOrder.guid2), {userData = ""})).outer;
+        let reverse = (await index.createSubDB(Blob.toArray(creatingOrder.guid2), {userData = ""})).outer;
         {
             order = (actor(Principal.toText(order.0)), order.1);
             reverse = (actor(Principal.toText(reverse.0)), reverse.1);
