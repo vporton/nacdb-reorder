@@ -54,7 +54,6 @@ module {
     };
 
     public type AddOptions = {
-        index: Nac.IndexCanister;
         order: Order;
         key: Int;
         value: Text;
@@ -68,12 +67,12 @@ module {
     };
 
     /// We assume that all keys have the same length.
-    public func add(guid: GUID.GUID, orderer: Orderer, options: AddOptions): async* () {
+    public func add(guid: GUID.GUID, index: Nac.IndexCanister, orderer: Orderer, options: AddOptions): async* () {
         ignore OpsQueue.whilePending(orderer.adding, func(guid: GUID.GUID, elt: AddItem): async* () {
             OpsQueue.answer(
                 orderer.adding,
                 guid,
-                await* addFinishByQueue(guid, orderer, elt));
+                await* addFinishByQueue(guid, index, orderer, elt));
         });
 
         let adding = switch (OpsQueue.get(orderer.adding, guid)) {
@@ -99,7 +98,7 @@ module {
         };
 
         try {
-            await* addFinishByQueue(guid, orderer, adding);
+            await* addFinishByQueue(guid, index, orderer, adding);
         }
         catch(e) {
             OpsQueue.add(orderer.adding, guid, adding);
@@ -111,15 +110,15 @@ module {
         OpsQueue.result(orderer.adding, guid);
     };
 
-    public func addFinishByQueue(guid: GUID.GUID, orderer: Orderer, adding: AddItem) : async* () {
+    public func addFinishByQueue(guid: GUID.GUID, index: Nac.IndexCanister, orderer: Orderer, adding: AddItem) : async* () {
         let key2 = encodeInt(adding.options.key) # "#" # encodeBlob(adding.random);
-        let q1 = adding.options.index.insert(Blob.toArray(adding.guid1), {
+        let q1 = index.insert(Blob.toArray(adding.guid1), {
             outerCanister = Principal.fromActor(adding.options.order.order.0);
             outerKey = adding.options.order.order.1;
             sk = key2;
             value = #text(adding.options.value);
         });
-        let q2 = adding.options.index.insert(Blob.toArray(adding.guid2), {
+        let q2 = index.insert(Blob.toArray(adding.guid2), {
             outerCanister = Principal.fromActor(adding.options.order.reverse.0);
             outerKey = adding.options.order.reverse.1;
             sk = adding.options.value;
@@ -132,7 +131,6 @@ module {
     };
 
     public type DeleteOptions = {
-        index: Nac.IndexCanister;
         order: Order;
         value: Text;
     };
@@ -141,7 +139,7 @@ module {
         options: DeleteOptions;
     };
 
-    public func delete(guid: GUID.GUID, orderer: Orderer, options: DeleteOptions): async* () {
+    public func delete(guid: GUID.GUID, index: Nac.IndexCanister, orderer: Orderer, options: DeleteOptions): async* () {
         ignore OpsQueue.whilePending(orderer.deleting, func(guid: GUID.GUID, elt: DeleteItem): async* () {
             OpsQueue.answer(
                 orderer.deleting,
@@ -212,7 +210,6 @@ module {
 
     /// Move value to new key.
     public type MoveOptions = {
-        index: Nac.IndexCanister;
         order: Order;
         value: Text;
         relative: Bool;
@@ -227,12 +224,12 @@ module {
         guid3: GUID.GUID;
     };
 
-    public func move(guid: GUID.GUID, orderer: Orderer, options: MoveOptions): async* () {
+    public func move(guid: GUID.GUID, index: Nac.IndexCanister, orderer: Orderer, options: MoveOptions): async* () {
         ignore OpsQueue.whilePending(orderer.moving, func(guid: GUID.GUID, elt: MoveItem): async* () {
             OpsQueue.answer(
                 orderer.moving,
                 guid,
-                await* moveFinishByQueue(guid, orderer, elt));
+                await* moveFinishByQueue(guid, index, orderer, elt));
         });
 
         let moving = switch (OpsQueue.get(orderer.moving, guid)) {
@@ -258,7 +255,7 @@ module {
         };
 
         try {
-            await* moveFinishByQueue(guid, orderer, moving);
+            await* moveFinishByQueue(guid, index, orderer, moving);
         }
         catch(e) {
             OpsQueue.add(orderer.moving, guid, moving);
@@ -270,7 +267,7 @@ module {
         OpsQueue.result(orderer.moving, guid);
     };
 
-    public func moveFinishByQueue(guid: GUID.GUID, orderer: Orderer, moving: MoveItem) : async* () {
+    public func moveFinishByQueue(guid: GUID.GUID, index: Nac.IndexCanister, orderer: Orderer, moving: MoveItem) : async* () {
         let newValueText = moving.options.value;
         let oldKey = await moving.options.order.reverse.0.getByInner({
             innerKey = moving.options.order.reverse.1;
@@ -296,13 +293,13 @@ module {
         };
         let newKeyText = encodeInt(newKey) # "#" # encodeBlob(moving.random);
 
-        let q1 = moving.options.index.insert(Blob.toArray(moving.guid1), {
+        let q1 = index.insert(Blob.toArray(moving.guid1), {
             outerCanister = Principal.fromActor(moving.options.order.order.0);
             outerKey = moving.options.order.order.1;
             sk = newKeyText;
             value = #text(moving.options.value);
         });
-        let q2 = moving.options.index.insert(Blob.toArray(moving.guid2), {
+        let q2 = index.insert(Blob.toArray(moving.guid2), {
             outerCanister = Principal.fromActor(moving.options.order.reverse.0);
             outerKey = moving.options.order.reverse.1;
             sk = newValueText;
@@ -311,7 +308,7 @@ module {
         ignore (await q1, await q2); // idempotent
         switch (oldKey) {
             case (?#text oldKeyText) {
-                await moving.options.index.delete(Blob.toArray(moving.guid3), {
+                await index.delete(Blob.toArray(moving.guid3), {
                     outerCanister = Principal.fromActor(moving.options.order.order.0);
                     outerKey = moving.options.order.order.1;
                     sk = oldKeyText;
