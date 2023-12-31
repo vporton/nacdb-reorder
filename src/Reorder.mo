@@ -440,7 +440,7 @@ module {
         result;
     };
 
-    public func encodeNat64(n: Nat64): Text {
+    func encodeNat64(n: Nat64): Text {
         var n64 = n;
         let buf = Buffer.Buffer<Nat8>(8);
         for (i in Iter.range(0, 7)) {
@@ -451,12 +451,12 @@ module {
         encodeBlob(blob);
     };
 
-    public func encodeNat(n: Nat): Text {
+    func encodeNat(n: Nat): Text {
         encodeNat64(Nat64.fromNat(n));
     };
 
     // For integers less than 2**64 have the same lexigraphical sort order as the argument.
-    public func encodeInt(n: Int): Text {
+    func encodeInt(n: Int): Text {
         assert n < 2**64;
         if (n >= 0) {
             encodeNat(Int.abs(n));
