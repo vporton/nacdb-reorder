@@ -78,6 +78,30 @@ actor Test {
             order;
         };
 
+        func moveForwardRelativeOrder(orderer: RO.Orderer): async* RO.Order {
+            let order = await* prepareOrder(orderer);
+            await* Reorder.moveRelative(GUID.nextGuid(guidGen), {
+                index;
+                order;
+                orderer;
+                keyDiff = 10 * (2**32) + (2**31);
+                value = Reorder.encodeInt(10);
+            });
+            order;
+        };
+
+        func moveBackwardRelativeOrder(orderer: RO.Orderer): async* RO.Order {
+            let order = await* prepareOrder(orderer);
+            await* Reorder.moveRelative(GUID.nextGuid(guidGen), {
+                index;
+                order;
+                orderer;
+                keyDiff = 10 * -(2**31);
+                value = Reorder.encodeInt(10);
+            });
+            order;
+        };
+
         let suite = Suite.suite("Reorder test", [
             Suite.suite("Move forward test", do {
                 let order1 = await* moveForwardOrder(orderer);
@@ -101,6 +125,46 @@ actor Test {
             }),
             Suite.suite("Move backward test", do {
                 let order1 = await* moveBackwardOrder(orderer);
+                let results = await order1.order.0.scanLimitOuter({
+                    outerKey = order1.order.1;
+                    lowerBound = "";
+                    upperBound = "zz";
+                    dir = #fwd;
+                    limit = 1000;
+                });
+                let results2 = Iter.map<(Text, Nac.AttributeValue), Text>(Array.vals(results.results), func((k, v): (Text, Nac.AttributeValue)) {
+                    let #text v2 = v else {
+                        Debug.trap("programming error");
+                    };
+                    v2;
+                });
+                [
+                    Suite.test("move element forward", Iter.toArray(results2), M.equals(
+                        myArray([Reorder.encodeInt(10), Reorder.encodeInt(0), Reorder.encodeInt(20)]))),
+                ];
+            }),
+            Suite.suite("Move forward relative test", do {
+                let order1 = await* moveForwardRelativeOrder(orderer);
+                let results = await order1.order.0.scanLimitOuter({
+                    outerKey = order1.order.1;
+                    lowerBound = "";
+                    upperBound = "zz";
+                    dir = #fwd;
+                    limit = 1000;
+                });
+                let results2 = Iter.map<(Text, Nac.AttributeValue), Text>(Array.vals(results.results), func((k, v): (Text, Nac.AttributeValue)) {
+                    let #text v2 = v else {
+                        Debug.trap("programming error");
+                    };
+                    v2;
+                });
+                [
+                    Suite.test("move element forward", Iter.toArray(results2), M.equals(
+                        myArray([Reorder.encodeInt(0), Reorder.encodeInt(20), Reorder.encodeInt(10)]))),
+                ];
+            }),
+            Suite.suite("Move backward relative test", do {
+                let order1 = await* moveBackwardRelativeOrder(orderer);
                 let results = await order1.order.0.scanLimitOuter({
                     outerKey = order1.order.1;
                     lowerBound = "";

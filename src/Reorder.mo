@@ -1,3 +1,4 @@
+import xNat "mo:xtended-numbers/NatX";
 import Nac "mo:nacdb/NacDB";
 import OpsQueue "mo:nacdb/OpsQueue";
 import GUID "mo:nacdb/GUID";
@@ -19,6 +20,7 @@ import Debug "mo:base/Debug";
 import Order "mo:base/Order";
 import Int "mo:base/Int";
 import Bool "mo:base/Bool";
+import Int8 "mo:base/Int8";
 import BTree "mo:stableheapbtreemap/BTree";
 
 module {
@@ -216,8 +218,23 @@ module {
         orderer: Orderer;
         order: Order;
         value: Text;
-        newKey: Int; // FIXME: Remove.
-        // updateKey: (oldKey: ?Int) -> 
+        updateKey: (oldKey: Text) -> Int;
+    };
+
+    public type MoveOptionsSimple = {
+        index: Nac.IndexCanister;
+        orderer: Orderer;
+        order: Order;
+        value: Text;
+        newKey: Int;
+    };
+
+    public type MoveOptionsRelative = {
+        index: Nac.IndexCanister;
+        orderer: Orderer;
+        order: Order;
+        value: Text;
+        keyDiff: Int;
     };
 
     public type MoveItem = {
@@ -228,7 +245,7 @@ module {
         guid3: GUID.GUID;
     };
 
-    public func move(guid: GUID.GUID, options: MoveOptions): async* () {
+    public func moveGeneral(guid: GUID.GUID, options: MoveOptions): async* () {
         ignore OpsQueue.whilePending(options.orderer.moving, func(guid: GUID.GUID, elt: MoveItem): async* () {
             OpsQueue.answer(
                 options.orderer.moving,
@@ -250,7 +267,7 @@ module {
 
                 {
                     options;
-                    random = GUID.nextGuid(options.orderer.guidGen); // FIXME: It seems unused
+                    random = GUID.nextGuid(options.orderer.guidGen);
                     guid1 = GUID.nextGuid(options.orderer.guidGen);
                     guid2 = GUID.nextGuid(options.orderer.guidGen);
                     guid3 = GUID.nextGuid(options.orderer.guidGen);
@@ -267,6 +284,26 @@ module {
         };
     };
 
+    public func move(guid: GUID.GUID, options: MoveOptionsSimple): async* () {
+        await* moveGeneral(guid, {
+            index = options.index;
+            orderer = options.orderer;
+            order = options.order;
+            value = options.value;
+            updateKey = func(_) = options.newKey;
+        });
+    };
+
+    public func moveRelative(guid: GUID.GUID, options: MoveOptionsRelative): async* () {
+        await* moveGeneral(guid, {
+            index = options.index;
+            orderer = options.orderer;
+            order = options.order;
+            value = options.value;
+            updateKey = func(old: Text): Int { decodeInt(old) + options.keyDiff };
+        });
+    };
+
     public func moveFinish(guid: GUID.GUID, orderer: Orderer) : async* ?() {
         OpsQueue.result(orderer.moving, guid);
     };
@@ -277,18 +314,20 @@ module {
             innerKey = moving.options.order.reverse.1;
             sk = newValueText;
         });
-        // let newKey = moving.updateKey(oldKey);
-        switch (oldKey) {
+        let newKey = switch (oldKey) {
             case (?#text oldKeyText) {
-                if (encodeInt(moving.options.newKey) ==
-                    Text.fromIter(Itertools.takeWhile(oldKeyText.chars(), func(c: Char): Bool { c != '#' })))
-                {
+                let oldKeyMainPart = Text.fromIter(Itertools.takeWhile(oldKeyText.chars(), func(c: Char): Bool { c != '#' }));
+                let newKey = moving.options.updateKey(oldKeyMainPart);
+                if (encodeInt(newKey) == oldKeyMainPart) {
                     return;
                 };
+                newKey;
             };
-            case _ {};
+            case _ {
+                Debug.trap("no reorder key");
+            };
         };
-        let newKeyText = encodeInt(moving.options.newKey);
+        let newKeyText = encodeInt(newKey) # "#" # encodeBlob(moving.random);
 
         let q1 = moving.options.index.insert(Blob.toArray(moving.guid1), {
             outerCanister = Principal.fromActor(moving.options.order.order.0);
@@ -424,6 +463,51 @@ module {
         } else {
             "-" # encodeNat(2**64 - Int.abs(n));
         };
+    };
+
+    func _fromLowerHexDigit(c: Char): Nat {
+        Nat32.toNat(
+        if (c <= '9') {
+            Char.toNat32(c) - Char.toNat32('0');
+        } else {
+            Char.toNat32(c) - Char.toNat32('a') + 10;
+        }
+        );
+    };
+
+    func decodeBlob(t: Text): Blob {
+        let buf = Buffer.Buffer<Nat8>(t.size() / 2);
+        let c = t.chars();
+        label r loop {
+        let ?upper = c.next() else {
+            break r;
+        };
+        let ?lower = c.next() else {
+            Debug.trap("decodeBlob: wrong hex number");
+        };
+        let b = Nat8.fromNat(_fromLowerHexDigit(upper) * 16 + _fromLowerHexDigit(lower));
+        buf.add(b);
+        };
+        Blob.fromArray(Buffer.toArray(buf));
+    };
+
+    func decodeNat(t: Text): Nat {
+        let blob = decodeBlob(t);
+        var result: Nat64 = 0;
+        for (b in blob.vals()) {
+            result <<= 8;
+            result += xNat.from8To64(b);
+        };
+        Nat64.toNat(result);
+    };
+
+    func decodeInt(t: Text): Int {
+        let iter = t.chars();
+        if (iter.next() == ?'-') {
+            -(2**64 - decodeNat(Text.fromIter(iter)));
+        } else {
+            decodeNat(t);
+        }
     };
 
     func comparePartition(x: Nac.PartitionCanister, y: Nac.PartitionCanister): {#equal; #greater; #less} {
