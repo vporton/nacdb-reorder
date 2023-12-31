@@ -7,6 +7,7 @@ import Nat64 "mo:base/Nat64";
 import Buffer "mo:base/Buffer";
 import Blob "mo:base/Blob";
 import Iter "mo:base/Iter";
+import Itertools "mo:itertools/Iter";
 import Nat8 "mo:base/Nat8";
 import Array "mo:base/Array";
 import Text "mo:base/Text";
@@ -17,6 +18,7 @@ import Nat "mo:base/Nat";
 import Debug "mo:base/Debug";
 import Order "mo:base/Order";
 import Int "mo:base/Int";
+import Bool "mo:base/Bool";
 import BTree "mo:stableheapbtreemap/BTree";
 
 module {
@@ -214,7 +216,8 @@ module {
         orderer: Orderer;
         order: Order;
         value: Text;
-        newKey: Int;
+        newKey: Int; // FIXME: Remove.
+        // updateKey: (oldKey: ?Int) -> 
     };
 
     public type MoveItem = {
@@ -274,8 +277,16 @@ module {
             innerKey = moving.options.order.reverse.1;
             sk = newValueText;
         });
-        if (?#int(moving.options.newKey) == oldKey) {
-            return;
+        // let newKey = moving.updateKey(oldKey);
+        switch (oldKey) {
+            case (?#text oldKeyText) {
+                if (encodeInt(moving.options.newKey) ==
+                    Text.fromIter(Itertools.takeWhile(oldKeyText.chars(), func(c: Char): Bool { c != '#' })))
+                {
+                    return;
+                };
+            };
+            case _ {};
         };
         let newKeyText = encodeInt(moving.options.newKey);
 
