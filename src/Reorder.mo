@@ -267,7 +267,7 @@ module {
 
     public func moveFinishByQueue(guid: GUID.GUID, index: Nac.IndexCanister, orderer: Orderer, moving: MoveItem) : async* () {
         let newValueText = moving.options.value;
-        let oldKey = await moving.options.order.reverse.0.getByInner({
+        let oldKey = await moving.options.order.reverse.0.getByInner({ // FIXME: Shouldn't it be `getByOuter`?
             innerKey = moving.options.order.reverse.1;
             sk = newValueText;
         });
