@@ -135,6 +135,8 @@ module {
 
     public type DeleteItem = {
         options: DeleteOptions;
+        guid1: GUID.GUID;
+        guid2: GUID.GUID;
     };
 
     public func delete(guid: GUID.GUID, index: Nac.IndexCanister, orderer: Orderer, options: DeleteOptions): async* () {
@@ -186,7 +188,7 @@ module {
         // The order of two following statements is essential:
         switch (key) {
             case (?#text keyText) {
-                await index.delete(Blob.toArray(GUID.nextGuid(orderer.guidGen)), {
+                await index.delete(Blob.toArray(deleting.guid1), {
                     outerCanister = Principal.fromActor(deleting.options.order.order.0);
                     outerKey = deleting.options.order.order.1;
                     sk = keyText;
@@ -198,7 +200,7 @@ module {
             }
         };
 
-        await index.delete(Blob.toArray(GUID.nextGuid(orderer.guidGen)), {
+        await index.delete(Blob.toArray(deleting.guid2), {
             outerCanister = Principal.fromActor(deleting.options.order.reverse.0);
             outerKey = deleting.options.order.reverse.1;
             sk = deleting.options.value;
