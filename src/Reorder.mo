@@ -196,6 +196,8 @@ module {
             };
             case null {}; // re-execution after an exception
             case _ {
+                ignore BTree.delete(orderer.block, compareLocs, deleting.options.order.order);
+                ignore BTree.delete(orderer.block, compareLocs, deleting.options.order.reverse);
                 Debug.trap("programming error");
             }
         };
@@ -291,6 +293,8 @@ module {
                 newKey;
             };
             case _ {
+                ignore BTree.delete(orderer.block, compareLocs, moving.options.order.order);
+                ignore BTree.delete(orderer.block, compareLocs, moving.options.order.reverse);
                 Debug.trap("no reorder key"); // FIXME: Here and in other places, unblock on trap.
             };
         };
@@ -319,6 +323,8 @@ module {
             };
             case null {}; // re-execution after an exception
             case _ {
+                ignore BTree.delete(orderer.block, compareLocs, moving.options.order.order);
+                ignore BTree.delete(orderer.block, compareLocs, moving.options.order.reverse);
                 Debug.trap("programming error");
             }
         };
