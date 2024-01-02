@@ -286,7 +286,7 @@ module {
                 newKey;
             };
             case _ {
-                Debug.trap("no reorder key");
+                Debug.trap("no reorder key"); // FIXME: Here and in other places, unblock on trap.
             };
         };
         let newKeyText = encodeInt(newKey) # "#" # encodeBlob(moving.random);
