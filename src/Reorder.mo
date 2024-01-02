@@ -178,8 +178,8 @@ module {
     };
 
     public func deleteFinishByQueue(orderer: Orderer, deleting: DeleteItem) : async* () {
-        let key = await deleting.options.order.reverse.0.getByInner({
-            innerKey = deleting.options.order.reverse.1;
+        let key = await deleting.options.order.reverse.0.getByOuter({
+            outerKey = deleting.options.order.reverse.1;
             sk = deleting.options.value;
         });
 
@@ -267,8 +267,8 @@ module {
 
     public func moveFinishByQueue(guid: GUID.GUID, index: Nac.IndexCanister, orderer: Orderer, moving: MoveItem) : async* () {
         let newValueText = moving.options.value;
-        let oldKey = await moving.options.order.reverse.0.getByInner({ // FIXME: Shouldn't it be `getByOuter`? (here and in other places)
-            innerKey = moving.options.order.reverse.1;
+        let oldKey = await moving.options.order.reverse.0.getByOuter({ // FIXME: Shouldn't it be `getByOuter`? (here and in other places)
+            outerKey = moving.options.order.reverse.1;
             sk = newValueText;
         });
         let newKey = switch (oldKey) {
