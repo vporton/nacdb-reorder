@@ -142,7 +142,7 @@ module {
             OpsQueue.answer(
                 orderer.deleting,
                 guid,
-                await* deleteFinishByQueue(orderer, elt));
+                await* deleteFinishByQueue(index, orderer, elt));
         });
 
         let deleting = switch (OpsQueue.get(orderer.deleting, guid)) {
@@ -165,7 +165,7 @@ module {
         };
 
         try {
-            await* deleteFinishByQueue(orderer, deleting);
+            await* deleteFinishByQueue(index, orderer, deleting);
         }
         catch(e) {
             OpsQueue.add(orderer.deleting, guid, deleting);
@@ -177,7 +177,7 @@ module {
         OpsQueue.result(orderer.deleting, guid);
     };
 
-    public func deleteFinishByQueue(orderer: Orderer, deleting: DeleteItem) : async* () {
+    public func deleteFinishByQueue(index: Nac.IndexCanister, orderer: Orderer, deleting: DeleteItem) : async* () {
         let key = await deleting.options.order.reverse.0.getByOuter({
             outerKey = deleting.options.order.reverse.1;
             sk = deleting.options.value;
@@ -186,8 +186,9 @@ module {
         // The order of two following statements is essential:
         switch (key) {
             case (?#text keyText) {
-                await deleting.options.order.order.0.deleteInner({
-                    innerKey = deleting.options.order.order.1;
+                await index.delete(Blob.toArray(GUID.nextGuid(orderer.guidGen)), {
+                    outerCanister = Principal.fromActor(deleting.options.order.order.0);
+                    outerKey = deleting.options.order.order.1;
                     sk = keyText;
                 });
             };
@@ -197,8 +198,9 @@ module {
             }
         };
 
-        await deleting.options.order.reverse.0.deleteInner({
-            innerKey = deleting.options.order.reverse.1;
+        await index.delete(Blob.toArray(GUID.nextGuid(orderer.guidGen)), {
+            outerCanister = Principal.fromActor(deleting.options.order.reverse.0);
+            outerKey = deleting.options.order.reverse.1;
             sk = deleting.options.value;
         });
 
