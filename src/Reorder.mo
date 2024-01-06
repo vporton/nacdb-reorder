@@ -288,6 +288,8 @@ module {
                     moving.options.newKey;
                 };
                 if (encodeInt(newKey) == oldKeyMainPart) {
+                    ignore BTree.delete(orderer.block, compareLocs, moving.options.order.order);
+                    ignore BTree.delete(orderer.block, compareLocs, moving.options.order.reverse);
                     return;
                 };
                 newKey;
