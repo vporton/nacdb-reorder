@@ -282,7 +282,7 @@ module {
         let newKey = switch (oldKey) {
             case (?#text oldKeyText) {
                 let oldKeyMainPart = Text.fromIter(Itertools.takeWhile(oldKeyText.chars(), func(c: Char): Bool { c != '#' }));
-                Debug.print("oldKeyMainPart: " # oldKeyMainPart # " = " # );
+                Debug.print("oldKeyMainPart: " # oldKeyMainPart);
                 Debug.print("oldKeyMainPart value: " # debug_show(decodeInt(oldKeyMainPart)));
                 Debug.print("moving.options.newKey: " # debug_show(moving.options.newKey));
                 // TODO: Apparently superfluous decodeInt/encodeInt pair
