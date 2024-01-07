@@ -122,7 +122,8 @@ module {
             sk = adding.options.value;
             value = #text key2;
         });
-        Debug.print("insert reverse: sk=" # adding.options.value # " value=" # key2);
+        Debug.print("insert reverse: outerKey=" # debug_show(adding.options.order.reverse.1) #
+            " sk=" # adding.options.value # " value=" # key2);
         ignore (await q1, await q2); // idempotent
 
         ignore BTree.delete(orderer.block, compareLocs, adding.options.order.order);
