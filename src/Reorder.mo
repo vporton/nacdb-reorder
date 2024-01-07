@@ -122,6 +122,7 @@ module {
             sk = adding.options.value;
             value = #text key2;
         });
+        Debug.print("insert reverse: sk=" # adding.options.value # " value=" # key2);
         ignore (await q1, await q2); // idempotent
 
         ignore BTree.delete(orderer.block, compareLocs, adding.options.order.order);
@@ -281,6 +282,9 @@ module {
         let newKey = switch (oldKey) {
             case (?#text oldKeyText) {
                 let oldKeyMainPart = Text.fromIter(Itertools.takeWhile(oldKeyText.chars(), func(c: Char): Bool { c != '#' }));
+                Debug.print("oldKeyMainPart: " # oldKeyMainPart # " = " # );
+                Debug.print("oldKeyMainPart value: " # debug_show(decodeInt(oldKeyMainPart)));
+                Debug.print("moving.options.newKey: " # debug_show(moving.options.newKey));
                 // TODO: Apparently superfluous decodeInt/encodeInt pair
                 let newKey = if (moving.options.relative) {
                     decodeInt(oldKeyMainPart) + moving.options.newKey;
