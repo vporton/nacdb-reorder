@@ -301,9 +301,10 @@ module {
                 newKey;
             };
             case _ {
-                ignore BTree.delete(orderer.block, compareLocs, moving.options.order.order);
-                ignore BTree.delete(orderer.block, compareLocs, moving.options.order.reverse);
-                Debug.trap("no reorder key"); // FIXME: Here and in other places, unblock on trap.
+                moving.options.newKey;
+                // ignore BTree.delete(orderer.block, compareLocs, moving.options.order.order);
+                // ignore BTree.delete(orderer.block, compareLocs, moving.options.order.reverse);
+                // Debug.trap("no reorder key"); // FIXME: Here and in other places, unblock on trap.
             };
         };
         let newKeyText = encodeInt(newKey) # "#" # encodeBlob(moving.random);
