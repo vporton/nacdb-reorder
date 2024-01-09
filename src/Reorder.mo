@@ -122,8 +122,6 @@ module {
             sk = adding.options.value;
             value = #text key2;
         });
-        Debug.print("insert reverse: outerKey=" # debug_show(adding.options.order.reverse.1) #
-            " sk=" # adding.options.value # " value=" # key2);
         ignore (await q1, await q2); // idempotent
 
         ignore BTree.delete(orderer.block, compareLocs, adding.options.order.order);
@@ -275,8 +273,6 @@ module {
 
     public func moveFinishByQueue(guid: GUID.GUID, index: Nac.IndexCanister, orderer: Orderer, moving: MoveItem) : async* () {
         let newValueText = moving.options.value;
-        Debug.print("newValueText: " # newValueText);
-        Debug.print("moving.options.order.reverse.1: " # debug_show(moving.options.order.reverse.1));
         let oldKey = await moving.options.order.reverse.0.getByOuter({
             outerKey = moving.options.order.reverse.1;
             sk = newValueText;
@@ -284,9 +280,6 @@ module {
         let newKey = switch (oldKey) {
             case (?#text oldKeyText) {
                 let oldKeyMainPart = Text.fromIter(Itertools.takeWhile(oldKeyText.chars(), func(c: Char): Bool { c != '#' }));
-                Debug.print("oldKeyMainPart: " # oldKeyMainPart);
-                Debug.print("oldKeyMainPart value: " # debug_show(decodeInt(oldKeyMainPart)));
-                Debug.print("moving.options.newKey: " # debug_show(moving.options.newKey));
                 // TODO: Apparently superfluous decodeInt/encodeInt pair
                 let newKey = if (moving.options.relative) {
                     decodeInt(oldKeyMainPart) + moving.options.newKey;
