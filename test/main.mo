@@ -39,7 +39,7 @@ actor Test {
         MyCycles.addPart(Common.dbOptions.partitionCycles);
         await index.init();
 
-        let orderer = RO.createOrderer();
+        let orderer = RO.createOrderer({queueLengths = 10});
 
         func createOrder(orderer: RO.Orderer): async* RO.Order {
             await* RO.createOrder(GUID.nextGuid(orderer.guidGen), index, orderer);

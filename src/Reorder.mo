@@ -33,13 +33,13 @@ module {
         block: BTree.BTree<(Nac.OuterCanister, Nac.OuterSubDBKey), ()>;
     };
 
-    public func createOrderer(): Orderer {
+    public func createOrderer({queueLengths: Nat}): Orderer {
         {
             guidGen = GUID.init(Array.tabulate<Nat8>(16, func _ = 0));
-            adding = OpsQueue.init(10); // FIXME: fixed number of entries
-            deleting = OpsQueue.init(10);
-            moving = OpsQueue.init(10);
-            creatingOrder = OpsQueue.init(10);
+            adding = OpsQueue.init(queueLengths);
+            deleting = OpsQueue.init(queueLengths);
+            moving = OpsQueue.init(queueLengths);
+            creatingOrder = OpsQueue.init(queueLengths);
             block = BTree.init(null);
         };
     };
@@ -297,7 +297,7 @@ module {
                 moving.options.newKey;
                 // ignore BTree.delete(orderer.block, compareLocs, moving.options.order.order);
                 // ignore BTree.delete(orderer.block, compareLocs, moving.options.order.reverse);
-                // Debug.trap("no reorder key"); // FIXME: Here and in other places, unblock on trap.
+                // Debug.trap("no reorder key");
             };
         };
         let newKeyText = encodeInt(newKey) # "#" # encodeBlob(moving.random);
