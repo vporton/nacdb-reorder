@@ -379,7 +379,13 @@ module {
     };
 
     // I run promises in order, rather than paralelly, to ensure they are executed once.
-    public func createOrderFinishByQueue(guid: GUID.GUID, index: Nac.IndexCanister, orderer: Orderer, creatingOrder: CreateOrderItem, hardCap: ?Nat) : async* Order {
+    public func createOrderFinishByQueue(
+        guid: GUID.GUID,
+        index: Nac.IndexCanister,
+        orderer: Orderer,
+        creatingOrder: CreateOrderItem,
+        hardCap: ?Nat
+    ) : async* Order {
         let order = switch(creatingOrder.order) {
             case (?order) { order };
             case null {
