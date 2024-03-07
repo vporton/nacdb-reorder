@@ -55,6 +55,7 @@ module {
         order: Order;
         key: Int;
         value: Text;
+        hardCap: ?Nat;
     };
 
     public type AddItem = {
@@ -115,12 +116,14 @@ module {
             outerKey = adding.options.order.order.1;
             sk = key2;
             value = #text(adding.options.value);
+            hardCap = adding.options.hardCap;
         });
         let q2 = index.insert(Blob.toArray(adding.guid2), {
             outerCanister = Principal.fromActor(adding.options.order.reverse.0);
             outerKey = adding.options.order.reverse.1;
             sk = adding.options.value;
             value = #text key2;
+            hardCap = adding.options.hardCap;
         });
         ignore (await q1, await q2); // idempotent
 
@@ -307,12 +310,14 @@ module {
             outerKey = moving.options.order.order.1;
             sk = newKeyText;
             value = #text(moving.options.value);
+            hardCap = null;
         });
         let q2 = index.insert(Blob.toArray(moving.guid2), {
             outerCanister = Principal.fromActor(moving.options.order.reverse.0);
             outerKey = moving.options.order.reverse.1;
             sk = newValueText;
             value = #text(newKeyText);
+            hardCap = null;
         });
         ignore (await q1, await q2); // idempotent
         switch (oldKey) {
@@ -341,12 +346,12 @@ module {
         order: ?(Principal, Nac.OuterSubDBKey); // To increase performace, store `OuterCanister` instead.
     };
 
-    public func createOrder(guid: GUID.GUID, index: Nac.IndexCanister, orderer: Orderer): async* Order {
+    public func createOrder(guid: GUID.GUID, index: Nac.IndexCanister, orderer: Orderer, hardCap: ?Nat): async* Order {
         ignore OpsQueue.whilePending(orderer.creatingOrder, func(guid: GUID.GUID, elt: CreateOrderItem): async* () {
             OpsQueue.answer(
                 orderer.creatingOrder,
                 guid,
-                await* createOrderFinishByQueue(guid, index, orderer, elt));
+                await* createOrderFinishByQueue(guid, index, orderer, elt, hardCap));
         });
 
         let creatingOrder = switch (OpsQueue.get(orderer.creatingOrder, guid)) {
@@ -361,10 +366,10 @@ module {
         };
 
         try {
-            await* createOrderFinishByQueue(guid, index, orderer, creatingOrder);
+            await* createOrderFinishByQueue(guid, index, orderer, creatingOrder, hardCap);
         }
         catch(e) {
-            OpsQueue.add(orderer.creatingOrder, guid, creatingOrder);
+            OpsQueue.add(orderer.creatingOrder, guid, creatingOrder, hardCap);
             throw e;
         };
     };
@@ -374,11 +379,11 @@ module {
     };
 
     // I run promises in order, rather than paralelly, to ensure they are executed once.
-    public func createOrderFinishByQueue(guid: GUID.GUID, index: Nac.IndexCanister, orderer: Orderer, creatingOrder: CreateOrderItem) : async* Order {
+    public func createOrderFinishByQueue(guid: GUID.GUID, index: Nac.IndexCanister, orderer: Orderer, creatingOrder: CreateOrderItem, hardCap: ?Nat) : async* Order {
         let order = switch(creatingOrder.order) {
             case (?order) { order };
             case null {
-                (await index.createSubDB(Blob.toArray(creatingOrder.guid1), {userData = ""})).outer;
+                (await index.createSubDB(Blob.toArray(creatingOrder.guid1), {userData = ""; hardCap})).outer;
             }
         };
         let reverse = (await index.createSubDB(Blob.toArray(creatingOrder.guid2), {userData = ""})).outer;

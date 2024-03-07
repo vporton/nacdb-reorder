@@ -1,7 +1,7 @@
 import Cycles "mo:base/ExperimentalCycles";
 import Nac "mo:nacdb/NacDB";
 import Partition "../partition/main";
-import StableBuffer "mo:stable-buffer/StableBuffer";
+import StableBuffer "mo:stable-buffer";
 import Principal "mo:base/Principal";
 import Debug "mo:base/Debug";
 import Blob "mo:base/Blob";
