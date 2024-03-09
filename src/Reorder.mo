@@ -343,7 +343,7 @@ module {
     public type CreateOrderItem = {
         guid1: GUID.GUID;
         guid2: GUID.GUID;
-        order: ?(Principal, Nac.OuterSubDBKey); // To increase performace, store `OuterCanister` instead.
+        order: ?(Principal, Nac.OuterSubDBKey); // TODO: To increase performace, store `OuterCanister` instead.
     };
 
     public func createOrder(guid: GUID.GUID, index: Nac.IndexCanister, orderer: Orderer, hardCap: ?Nat): async* Order {
