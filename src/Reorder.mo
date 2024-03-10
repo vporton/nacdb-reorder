@@ -343,7 +343,7 @@ module {
     public type CreateOrderItem = {
         guid1: GUID.GUID;
         guid2: GUID.GUID;
-        order: ?{canister: Principal; outerKey: Nac.OuterSubDBKey}; // TODO: To increase performace, store `OuterCanister` instead.
+        order: ?{canister: Principal; key: Nac.OuterSubDBKey}; // TODO: To increase performace, store `OuterCanister` instead.
         hardCap: ?Nat;
     };
 
@@ -399,8 +399,8 @@ module {
             hardCap = creatingOrder.hardCap;
         })).outer;
         {
-            order = (actor(Principal.toText(order.canister)), order.outerKey);
-            reverse = (actor(Principal.toText(reverse.canister)), reverse.outerKey);
+            order = (actor(Principal.toText(order.canister)), order.key);
+            reverse = (actor(Principal.toText(reverse.canister)), reverse.key);
         };
     };
 
