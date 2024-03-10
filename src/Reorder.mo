@@ -343,7 +343,8 @@ module {
     public type CreateOrderItem = {
         guid1: GUID.GUID;
         guid2: GUID.GUID;
-        order: ?(Principal, Nac.OuterSubDBKey); // TODO: To increase performace, store `OuterCanister` instead.
+        order: ?{canister: Principal; outerKey: Nac.OuterSubDBKey}; // TODO: To increase performace, store `OuterCanister` instead.
+        hardCap: ?Nat;
     };
 
     public func createOrder(guid: GUID.GUID, index: Nac.IndexCanister, orderer: Orderer, hardCap: ?Nat): async* Order {
@@ -351,7 +352,7 @@ module {
             OpsQueue.answer(
                 orderer.creatingOrder,
                 guid,
-                await* createOrderFinishByQueue(guid, index, orderer, elt, hardCap));
+                await* createOrderFinishByQueue(index, elt));
         });
 
         let creatingOrder = switch (OpsQueue.get(orderer.creatingOrder, guid)) {
@@ -360,16 +361,17 @@ module {
                 {
                     guid1 = GUID.nextGuid(orderer.guidGen);
                     guid2 = GUID.nextGuid(orderer.guidGen);
+                    hardCap;
                     order = null;
                 };
             };
         };
 
         try {
-            await* createOrderFinishByQueue(guid, index, orderer, creatingOrder, hardCap);
+            await* createOrderFinishByQueue(index, creatingOrder);
         }
         catch(e) {
-            OpsQueue.add(orderer.creatingOrder, guid, creatingOrder, hardCap);
+            OpsQueue.add(orderer.creatingOrder, guid, creatingOrder);
             throw e;
         };
     };
@@ -380,22 +382,25 @@ module {
 
     // I run promises in order, rather than paralelly, to ensure they are executed once.
     public func createOrderFinishByQueue(
-        guid: GUID.GUID,
         index: Nac.IndexCanister,
-        orderer: Orderer,
         creatingOrder: CreateOrderItem,
-        hardCap: ?Nat
     ) : async* Order {
         let order = switch(creatingOrder.order) {
             case (?order) { order };
             case null {
-                (await index.createSubDB(Blob.toArray(creatingOrder.guid1), {userData = ""; hardCap})).outer;
+                (await index.createSubDB(Blob.toArray(creatingOrder.guid1), {
+                    userData = "";
+                    hardCap = creatingOrder.hardCap;
+                })).outer;
             }
         };
-        let reverse = (await index.createSubDB(Blob.toArray(creatingOrder.guid2), {userData = ""})).outer;
+        let reverse = (await index.createSubDB(Blob.toArray(creatingOrder.guid2), {
+            userData = "";
+            hardCap = creatingOrder.hardCap;
+        })).outer;
         {
-            order = (actor(Principal.toText(order.0)), order.1);
-            reverse = (actor(Principal.toText(reverse.0)), reverse.1);
+            order = (actor(Principal.toText(order.canister)), order.outerKey);
+            reverse = (actor(Principal.toText(reverse.canister)), reverse.outerKey);
         };
     };
 
