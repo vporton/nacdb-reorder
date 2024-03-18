@@ -2,8 +2,6 @@ import xNat "mo:xtended-numbers/NatX";
 import Nac "mo:nacdb/NacDB";
 import OpsQueue "mo:nacdb/OpsQueue";
 import GUID "mo:nacdb/GUID";
-import Can "mo:candb/CanDB";
-import Entity "mo:candb/Entity";
 import Nat64 "mo:base/Nat64";
 import Buffer "mo:base/Buffer";
 import Blob "mo:base/Blob";
@@ -20,10 +18,13 @@ import Debug "mo:base/Debug";
 import Order "mo:base/Order";
 import Int "mo:base/Int";
 import Bool "mo:base/Bool";
-import Int8 "mo:base/Int8";
 import BTree "mo:stableheapbtreemap/BTree";
 
 module {
+    /// `Orderer` is used to manage `Order` objects.
+    /// You should have one `Orderer` per application (e.g. as a `stable variable`).
+    ///
+    /// Threat this as an opaque type.
     public type Orderer = {
         guidGen: GUID.GUIDGenerator;
         adding: OpsQueue.OpsQueue<AddItem, ()>;
