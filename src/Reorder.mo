@@ -22,7 +22,7 @@ import BTree "mo:stableheapbtreemap/BTree";
 
 module {
     /// `Orderer` is used to manage `Order` objects.
-    /// You should have one `Orderer` per application (e.g. as a `stable variable`).
+    /// You should have one `Orderer` per application (e.g. as a `stable` variable).
     ///
     /// Threat this as an opaque type.
     public type Orderer = {
