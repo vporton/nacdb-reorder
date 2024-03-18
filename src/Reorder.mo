@@ -404,7 +404,7 @@ module {
         };
     };
 
-   // TODO: duplicate code with `zondirectory2` repo
+    // TODO: duplicate code with `zondirectory2` repo
 
     func _toLowerHexDigit(v: Nat): Char {
         Char.fromNat32(Nat32.fromNat(
