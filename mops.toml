@@ -14,8 +14,8 @@ prng = "0.0.3"
 
 [package]
 name = "nacdb-reorder"
-version = "2.0.3"
+version = "2.0.4"
 description = "Reorderable lists in NacDB database"
-repository = "https://github.com/vporton/NacDBReorder"
+repository = "https://github.com/vporton/nacdb-reorder"
 keywords = [ "database", "databases", "order", "reorder", "nacdb" ]
 license = "MIT"
