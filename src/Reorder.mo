@@ -34,6 +34,7 @@ module {
         block: BTree.BTree<(Nac.OuterCanister, Nac.OuterSubDBKey), ()>;
     };
 
+    /// Create an `Orderer`. Queue length (see `nacdb` package, `OpsQueue` module) are specified.
     public func createOrderer({queueLengths: Nat}): Orderer {
         {
             guidGen = GUID.init(Array.tabulate<Nat8>(16, func _ = 0));
@@ -45,7 +46,14 @@ module {
         };
     };
 
-    /// Keys may be duplicated, but all values are distinct.
+    /// `Order` represent a list of distinct values ordered by string keys:
+    ///
+    /// * `order` is a NacDB sub-DB: Key#random -> Value
+    /// * `reverse` is a NacDB sub-DB: Value -> Key#random
+    ///
+    /// To create an `Order` create two NacDB sub-DBs and assign it to these fields.
+    ///
+    /// Keys may be duplicated, but all values must be distinct.
     public type Order = {
         // A random string is added to a key in order to ensure key are unique.
         order: (Nac.OuterCanister, Nac.OuterSubDBKey); // Key#random -> Value.
@@ -66,6 +74,8 @@ module {
         guid2: GUID.GUID;
     };
 
+    /// Add a key-value pair to an `Order`. The key is inserted as it should by the order.
+    ///
     /// We assume that all keys have the same length.
     public func add(guid: GUID.GUID, index: Nac.IndexCanister, orderer: Orderer, options: AddOptions): async* () {
         ignore OpsQueue.whilePending(orderer.adding, func(guid: GUID.GUID, elt: AddItem): async* () {
@@ -106,6 +116,7 @@ module {
         };
     };
 
+    /// Finish an interrupted `add` task.
     public func addFinish(guid: GUID.GUID, orderer: Orderer) : async* ?() {
         OpsQueue.result(orderer.adding, guid);
     };
@@ -143,6 +154,7 @@ module {
         guid2: GUID.GUID;
     };
 
+    /// Delete a key/value pair (modifies both NacDB sub-DBs `order` and `reverse`).
     public func delete(guid: GUID.GUID, index: Nac.IndexCanister, orderer: Orderer, options: DeleteOptions): async* () {
         ignore OpsQueue.whilePending(orderer.deleting, func(guid: GUID.GUID, elt: DeleteItem): async* () {
             OpsQueue.answer(
@@ -179,6 +191,7 @@ module {
         };
     };
 
+    /// Finish an interrupted `delete` operation.
     public func deleteFinish(guid: GUID.GUID, orderer: Orderer) : async* ?() {
         OpsQueue.result(orderer.deleting, guid);
     };
@@ -232,6 +245,8 @@ module {
         guid3: GUID.GUID;
     };
 
+    /// Move an item in `order` (that is in both two Nac sub-DBs) to a position specified by `newKey`.
+    /// If `relative`, then `newKey` is added to an existing order value rathen than replace it.
     public func move(guid: GUID.GUID, index: Nac.IndexCanister, orderer: Orderer, options: MoveOptions): async* () {
         ignore OpsQueue.whilePending(orderer.moving, func(guid: GUID.GUID, elt: MoveItem): async* () {
             OpsQueue.answer(
@@ -271,6 +286,7 @@ module {
         };
     };
 
+    /// Finish an interrupted move operation.
     public func moveFinish(guid: GUID.GUID, orderer: Orderer) : async* ?() {
         OpsQueue.result(orderer.moving, guid);
     };
@@ -348,6 +364,7 @@ module {
         hardCap: ?Nat;
     };
 
+    /// Create an `Order` (two NacDB sub-DBs).
     public func createOrder(guid: GUID.GUID, index: Nac.IndexCanister, orderer: Orderer, hardCap: ?Nat): async* Order {
         ignore OpsQueue.whilePending(orderer.creatingOrder, func(guid: GUID.GUID, elt: CreateOrderItem): async* () {
             OpsQueue.answer(
@@ -377,6 +394,7 @@ module {
         };
     };
 
+    /// Finish an interrupted `createOrder` operation.
     public func createOrderFinish(guid: GUID.GUID, orderer: Orderer) : async* ?Order {
         OpsQueue.result(orderer.creatingOrder, guid);
     };
