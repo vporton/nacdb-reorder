@@ -8,13 +8,13 @@ itertools = "0.1.2"
 xtended-numbers = "0.2.1"
 
 [dev-dependencies]
-matchers = "https://github.com/kritzcreek/motoko-matchers#master"
+matchers = "https://github.com/kritzcreek/motoko-matchers#master@3dac8a071b69e4e651b25a7d9683fe831eb7cffd"
 candb = "1.0.2"
 prng = "0.0.3"
 
 [package]
 name = "nacdb-reorder"
-version = "2.0.2"
+version = "2.0.3"
 description = "Reorderable lists in NacDB database"
 repository = "https://github.com/vporton/NacDBReorder"
 keywords = [ "database", "databases", "order", "reorder", "nacdb" ]
