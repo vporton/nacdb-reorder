@@ -61,6 +61,8 @@ module {
     };
 
     public type AddOptions = {
+        index: Nac.IndexCanister;
+        dbIndex: Nac.DBIndex;
         order: Order;
         key: Int;
         value: Text;
@@ -77,12 +79,12 @@ module {
     /// Add a key-value pair to an `Order`. The key is inserted as it should by the order.
     ///
     /// We assume that all keys have the same length.
-    public func add(guid: GUID.GUID, index: Nac.IndexCanister, orderer: Orderer, options: AddOptions): async* () {
+    public func add(guid: GUID.GUID, orderer: Orderer, options: AddOptions): async* () {
         ignore OpsQueue.whilePending(orderer.adding, func(guid: GUID.GUID, elt: AddItem): async* () {
             OpsQueue.answer(
                 orderer.adding,
                 guid,
-                await* addFinishByQueue(guid, index, orderer, elt));
+                await* addFinishByQueue(guid, orderer, elt));
         });
 
         let adding = switch (OpsQueue.get(orderer.adding, guid)) {
@@ -108,7 +110,7 @@ module {
         };
 
         try {
-            await* addFinishByQueue(guid, index, orderer, adding);
+            await* addFinishByQueue(guid, orderer, adding);
         }
         catch(e) {
             OpsQueue.add(orderer.adding, guid, adding);
@@ -121,29 +123,33 @@ module {
         OpsQueue.result(orderer.adding, guid);
     };
 
-    public func addFinishByQueue(guid: GUID.GUID, index: Nac.IndexCanister, orderer: Orderer, adding: AddItem) : async* () {
+    public func addFinishByQueue(guid: GUID.GUID, orderer: Orderer, adding: AddItem) : async* () {
         let key2 = encodeInt(adding.options.key) # "#" # encodeBlob(adding.random);
-        let q1 = index.insert(Blob.toArray(adding.guid1), {
+        ignore await* Nac.insert(adding.guid1, {
+            indexCanister = Principal.fromActor(adding.options.index);
+            dbIndex = adding.options.dbIndex;
             outerCanister = Principal.fromActor(adding.options.order.order.0);
             outerKey = adding.options.order.order.1;
             sk = key2;
             value = #text(adding.options.value);
             hardCap = adding.options.hardCap;
         });
-        let q2 = index.insert(Blob.toArray(adding.guid2), {
+        ignore await* Nac.insert(adding.guid2, {
+            indexCanister = Principal.fromActor(adding.options.index);
+            dbIndex = adding.options.dbIndex;
             outerCanister = Principal.fromActor(adding.options.order.reverse.0);
             outerKey = adding.options.order.reverse.1;
             sk = adding.options.value;
             value = #text key2;
             hardCap = adding.options.hardCap;
         });
-        ignore (await q1, await q2); // idempotent
 
         ignore BTree.delete(orderer.block, compareLocs, adding.options.order.order);
         ignore BTree.delete(orderer.block, compareLocs, adding.options.order.reverse);
     };
 
     public type DeleteOptions = {
+        dbIndex: Nac.DBIndex;
         order: Order;
         value: Text;
     };
@@ -205,8 +211,9 @@ module {
         // The order of two following statements is essential:
         switch (key) {
             case (?#text keyText) {
-                await index.delete(Blob.toArray(deleting.guid1), {
-                    outerCanister = Principal.fromActor(deleting.options.order.order.0);
+                await* Nac.delete(deleting.guid1, {
+                    dbIndex = deleting.options.dbIndex;
+                    outerCanister = deleting.options.order.order.0;
                     outerKey = deleting.options.order.order.1;
                     sk = keyText;
                 });
@@ -219,8 +226,9 @@ module {
             }
         };
 
-        await index.delete(Blob.toArray(deleting.guid2), {
-            outerCanister = Principal.fromActor(deleting.options.order.reverse.0);
+        await* Nac.delete(deleting.guid2, {
+            dbIndex = deleting.options.dbIndex;
+            outerCanister = deleting.options.order.reverse.0;
             outerKey = deleting.options.order.reverse.1;
             sk = deleting.options.value;
         });
@@ -231,6 +239,7 @@ module {
 
     /// Move value to new key.
     public type MoveOptions = {
+        dbIndex: Nac.DBIndex;
         order: Order;
         value: Text;
         relative: Bool;
@@ -322,25 +331,29 @@ module {
         };
         let newKeyText = encodeInt(newKey) # "#" # encodeBlob(moving.random);
 
-        let q1 = index.insert(Blob.toArray(moving.guid1), {
+        ignore await* Nac.insert(moving.guid1, {
+            indexCanister = Principal.fromActor(index);
+            dbIndex = moving.options.dbIndex;
             outerCanister = Principal.fromActor(moving.options.order.order.0);
             outerKey = moving.options.order.order.1;
             sk = newKeyText;
             value = #text(moving.options.value);
             hardCap = null;
         });
-        let q2 = index.insert(Blob.toArray(moving.guid2), {
+        ignore await* Nac.insert(moving.guid2, {
+            indexCanister = Principal.fromActor(index);
+            dbIndex = moving.options.dbIndex;
             outerCanister = Principal.fromActor(moving.options.order.reverse.0);
             outerKey = moving.options.order.reverse.1;
             sk = newValueText;
             value = #text(newKeyText);
             hardCap = null;
         });
-        ignore (await q1, await q2); // idempotent
         switch (oldKey) {
             case (?#text oldKeyText) {
-                await index.delete(Blob.toArray(moving.guid3), {
-                    outerCanister = Principal.fromActor(moving.options.order.order.0);
+                await* Nac.delete(moving.guid3, {
+                    dbIndex = moving.options.dbIndex;
+                    outerCanister = moving.options.order.order.0;
                     outerKey = moving.options.order.order.1;
                     sk = oldKeyText;
                 });
@@ -357,69 +370,77 @@ module {
         ignore BTree.delete(orderer.block, compareLocs, moving.options.order.reverse);
     };
 
-    public type CreateOrderItem = {
-        guid1: GUID.GUID;
-        guid2: GUID.GUID;
-        order: ?{canister: Principal; key: Nac.OuterSubDBKey}; // TODO: To increase performace, store `OuterCanister` instead.
+    public type CreateOrderOptions = {
+        index: Nac.IndexCanister;
+        dbIndex: Nac.DBIndex;
+        orderer: Orderer;
         hardCap: ?Nat;
     };
 
+    public type CreateOrderItem = {
+        options: CreateOrderOptions;
+        guid1: GUID.GUID;
+        guid2: GUID.GUID;
+        order: ?{canister: Nac.OuterCanister; key: Nac.OuterSubDBKey}; // TODO: To increase performace, store `OuterCanister` instead.
+    };
+
     /// Create an `Order` (two NacDB sub-DBs).
-    public func createOrder(guid: GUID.GUID, index: Nac.IndexCanister, orderer: Orderer, hardCap: ?Nat): async* Order {
-        ignore OpsQueue.whilePending(orderer.creatingOrder, func(guid: GUID.GUID, elt: CreateOrderItem): async* () {
+    public func createOrder(guid: GUID.GUID, options: CreateOrderOptions): async* Order {
+        ignore OpsQueue.whilePending(options.orderer.creatingOrder, func(guid: GUID.GUID, elt: CreateOrderItem): async* () {
             OpsQueue.answer(
-                orderer.creatingOrder,
+                options.orderer.creatingOrder,
                 guid,
-                await* createOrderFinishByQueue(index, elt));
+                await* createOrderFinishByQueue(guid, elt));
         });
 
-        let creatingOrder = switch (OpsQueue.get(orderer.creatingOrder, guid)) {
+        let creatingOrder = switch (OpsQueue.get(options.orderer.creatingOrder, guid)) {
             case (?moving) { moving };
             case null {
                 {
-                    guid1 = GUID.nextGuid(orderer.guidGen);
-                    guid2 = GUID.nextGuid(orderer.guidGen);
-                    hardCap;
+                    options;
+                    guid1 = GUID.nextGuid(options.orderer.guidGen);
+                    guid2 = GUID.nextGuid(options.orderer.guidGen);
                     order = null;
                 };
             };
         };
 
         try {
-            await* createOrderFinishByQueue(index, creatingOrder);
+            await* createOrderFinishByQueue(guid, creatingOrder);
         }
         catch(e) {
-            OpsQueue.add(orderer.creatingOrder, guid, creatingOrder);
+            OpsQueue.add(options.orderer.creatingOrder, guid, creatingOrder);
             throw e;
         };
     };
 
     /// Finish an interrupted `createOrder` operation.
-    public func createOrderFinish(guid: GUID.GUID, orderer: Orderer) : async* ?Order {
-        OpsQueue.result(orderer.creatingOrder, guid);
+    public func createOrderFinish(guid: GUID.GUID, options: CreateOrderOptions) : async* ?Order {
+        OpsQueue.result(options.orderer.creatingOrder, guid);
     };
 
     // I run promises in order, rather than paralelly, to ensure they are executed once.
-    public func createOrderFinishByQueue(
-        index: Nac.IndexCanister,
-        creatingOrder: CreateOrderItem,
-    ) : async* Order {
+    public func createOrderFinishByQueue(_guid: GUID.GUID, creatingOrder: CreateOrderItem) : async* Order {
         let order = switch(creatingOrder.order) {
             case (?order) { order };
             case null {
-                (await index.createSubDB(Blob.toArray(creatingOrder.guid1), {
+                (await* Nac.createSubDB(creatingOrder.guid1, {
+                    index = creatingOrder.options.index;
+                    dbIndex = creatingOrder.options.dbIndex;
                     userData = "";
-                    hardCap = creatingOrder.hardCap;
+                    hardCap = creatingOrder.options.hardCap;
                 })).outer;
             }
         };
-        let reverse = (await index.createSubDB(Blob.toArray(creatingOrder.guid2), {
+        let reverse = (await* Nac.createSubDB(creatingOrder.guid2, {
+            index = creatingOrder.options.index;
+            dbIndex = creatingOrder.options.dbIndex;
             userData = "";
-            hardCap = creatingOrder.hardCap;
+            hardCap = creatingOrder.options.hardCap;
         })).outer;
         {
-            order = (actor(Principal.toText(order.canister)), order.key);
-            reverse = (actor(Principal.toText(reverse.canister)), reverse.key);
+            order = (order.canister, order.key);
+            reverse = (reverse.canister, reverse.key);
         };
     };
 
