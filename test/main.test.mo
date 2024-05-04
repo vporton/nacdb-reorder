@@ -37,14 +37,16 @@ actor Test {
         MyCycles.addPart<system>(Common.dbOptions.partitionCycles);
         await index.init();
 
-        let guidGen = GUID.init(Array.tabulate<Nat8>(16, func _ = 0));
+        let orderer = RO.createOrderer({queueLengths = 10});
 
-        func createOrder(): async* RO.Order {
-            await index.reorderCreateOrder(GUID.nextGuid(guidGen));
+        func createOrder(orderer: RO.Orderer): async* RO.Order {
+            await index.reorderCreateOrder(GUID.nextGuid(orderer.guidGen));
         };
 
-        func prepareOrder(): async* RO.Order {
-            let order = await* createOrder();
+        let guidGen = GUID.init(Array.tabulate<Nat8>(16, func _ = 0));
+
+        func prepareOrder(orderer: RO.Orderer): async* RO.Order {
+            let order = await* createOrder(orderer);
             for (i in Iter.range(0, 2)) {
                 await index.reorderAdd(GUID.nextGuid(guidGen), {
                     key = i * (2**32);
@@ -55,9 +57,10 @@ actor Test {
             order;
         };
 
-        func moveForwardOrder(): async* RO.Order {
-            let order = await* prepareOrder();
+        func moveForwardOrder(orderer: RO.Orderer): async* RO.Order {
+            let order = await* prepareOrder(orderer);
             await index.reorderMove(GUID.nextGuid(guidGen), {
+                index;
                 order;
                 relative = false;
                 newKey = 2 * (2**32) + (2**31);
@@ -66,8 +69,8 @@ actor Test {
             order;
         };
 
-        func moveBackwardOrder(): async* RO.Order {
-            let order = await* prepareOrder();
+        func moveBackwardOrder(orderer: RO.Orderer): async* RO.Order {
+            let order = await* prepareOrder(orderer);
             await index.reorderMove(GUID.nextGuid(guidGen), {
                 order;
                 relative = false;
@@ -77,8 +80,8 @@ actor Test {
             order;
         };
 
-        func moveForwardRelativeOrder(): async* RO.Order {
-            let order = await* prepareOrder();
+        func moveForwardRelativeOrder(orderer: RO.Orderer): async* RO.Order {
+            let order = await* prepareOrder(orderer);
             await index.reorderMove(GUID.nextGuid(guidGen), {
                 order;
                 relative = true;
@@ -88,8 +91,8 @@ actor Test {
             order;
         };
 
-        func moveBackwardRelativeOrder(): async* RO.Order {
-            let order = await* prepareOrder();
+        func moveBackwardRelativeOrder(orderer: RO.Orderer): async* RO.Order {
+            let order = await* prepareOrder(orderer);
             await index.reorderMove(GUID.nextGuid(guidGen), {
                 order;
                 relative = true;
@@ -101,7 +104,7 @@ actor Test {
 
         let suite = Suite.suite("Reorder test", [
             Suite.suite("Move forward test", do {
-                let order1 = await* moveForwardOrder();
+                let order1 = await* moveForwardOrder(orderer);
                 let results = await order1.order.0.scanLimitOuter({
                     outerKey = order1.order.1;
                     lowerBound = "";
@@ -121,7 +124,7 @@ actor Test {
                 ];
             }),
             Suite.suite("Move backward test", do {
-                let order1 = await* moveBackwardOrder();
+                let order1 = await* moveBackwardOrder(orderer);
                 let results = await order1.order.0.scanLimitOuter({
                     outerKey = order1.order.1;
                     lowerBound = "";
@@ -141,7 +144,7 @@ actor Test {
                 ];
             }),
             Suite.suite("Move forward relative test", do {
-                let order1 = await* moveForwardRelativeOrder();
+                let order1 = await* moveForwardRelativeOrder(orderer);
                 let results = await order1.order.0.scanLimitOuter({
                     outerKey = order1.order.1;
                     lowerBound = "";
@@ -161,7 +164,7 @@ actor Test {
                 ];
             }),
             Suite.suite("Move backward relative test", do {
-                let order1 = await* moveBackwardRelativeOrder();
+                let order1 = await* moveBackwardRelativeOrder(orderer);
                 let results = await order1.order.0.scanLimitOuter({
                     outerKey = order1.order.1;
                     lowerBound = "";

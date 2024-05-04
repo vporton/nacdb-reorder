@@ -1,14 +1,14 @@
-import Cycles "mo:base/ExperimentalCycles";
+import RO "../../src/Reorder";
 import Nac "mo:nacdb/NacDB";
+import GUID "mo:nacdb/GUID";
+import MyCycles "mo:nacdb/Cycles";
 import Partition "../partition/main";
-import StableBuffer "mo:stable-buffer";
+import StableBuffer "mo:stable-buffer/StableBuffer";
 import Principal "mo:base/Principal";
 import Debug "mo:base/Debug";
 import Blob "mo:base/Blob";
-import Array "mo:base/Array";
 import Iter "mo:base/Iter";
 import Result "mo:base/Result";
-import MyCycles "mo:nacdb/Cycles";
 import Common "../common";
 
 shared actor class Index() = this {
@@ -17,33 +17,36 @@ shared actor class Index() = this {
     stable var initialized = false;
 
     public shared func init() : async () {
-        ignore MyCycles.topUpCycles(Common.dbOptions.partitionCycles);
+        ignore MyCycles.topUpCycles<system>(Common.dbOptions.partitionCycles);
         if (initialized) {
             Debug.trap("already initialized");
         };
-        MyCycles.addPart(Common.dbOptions.partitionCycles);
+        MyCycles.addPart<system>(Common.dbOptions.partitionCycles);
         StableBuffer.add(dbIndex.canisters, await Partition.Partition());
         initialized := true;
     };
 
     public shared func createPartition(): async Principal {
-        ignore MyCycles.topUpCycles(Common.dbOptions.partitionCycles);
-        MyCycles.addPart(Common.dbOptions.partitionCycles);
+        ignore MyCycles.topUpCycles<system>(Common.dbOptions.partitionCycles);
+        MyCycles.addPart<system>(Common.dbOptions.partitionCycles);
         Principal.fromActor(await Partition.Partition());
     };
 
     public query func getCanisters(): async [Principal] {
-        // ignore MyCycles.topUpCycles(Common.dbOptions.partitionCycles);
+        // ignore MyCycles.topUpCycles<system>(Common.dbOptions.partitionCycles);
         let iter = Iter.map(Nac.getCanisters(dbIndex).vals(), func (x: Nac.PartitionCanister): Principal {Principal.fromActor(x)});
         Iter.toArray(iter);
     };
 
-    public shared func createSubDB(guid: [Nat8], {userData: Text})
-        : async {inner: (Principal, Nac.InnerSubDBKey); outer: (Principal, Nac.OuterSubDBKey)}
+    public shared func createSubDB(guid: [Nat8], {userData: Text; hardCap: ?Nat})
+        : async {inner: {canister: Principal; key: Nac.InnerSubDBKey}; outer: {canister: Principal; key: Nac.OuterSubDBKey}}
     {
-        ignore MyCycles.topUpCycles(Common.dbOptions.partitionCycles);
-        let r = await* Nac.createSubDB(Blob.fromArray(guid), {index = this; dbIndex; dbOptions = Common.dbOptions; userData});
-        { inner = (Principal.fromActor(r.inner.0), r.inner.1); outer = (Principal.fromActor(r.outer.0), r.outer.1) };
+        ignore MyCycles.topUpCycles<system>(Common.dbOptions.partitionCycles);
+        let r = await* Nac.createSubDB(Blob.fromArray(guid), {index = this; dbIndex; dbOptions = Common.dbOptions; userData; hardCap});
+        {
+            inner = {canister = Principal.fromActor(r.inner.canister); key = r.inner.key};
+            outer = {canister = Principal.fromActor(r.outer.canister); key = r.outer.key};
+        };
     };
 
     public shared func insert(guid: [Nat8], {
@@ -51,8 +54,9 @@ shared actor class Index() = this {
         outerKey: Nac.OuterSubDBKey;
         sk: Nac.SK;
         value: Nac.AttributeValue;
-    }) : async Result.Result<{inner: (Principal, Nac.InnerSubDBKey); outer: (Principal, Nac.OuterSubDBKey)}, Text> {
-        ignore MyCycles.topUpCycles(Common.dbOptions.partitionCycles);
+        hardCap: ?Nat;
+    }) : async Result.Result<{inner: {canister: Principal; key: Nac.InnerSubDBKey}; outer: {canister: Principal; key: Nac.OuterSubDBKey}}, Text> {
+        ignore MyCycles.topUpCycles<system>(Common.dbOptions.partitionCycles);
         let res = await* Nac.insert(Blob.fromArray(guid), {
             indexCanister = Principal.fromActor(this);
             dbIndex;
@@ -60,10 +64,14 @@ shared actor class Index() = this {
             outerKey;
             sk;
             value;
+            hardCap;
         });
         switch (res) {
             case (#ok { inner; outer }) {
-                #ok { inner = (Principal.fromActor(inner.0), inner.1); outer = (Principal.fromActor(outer.0), outer.1) };
+                #ok {
+                    inner = { canister = Principal.fromActor(inner.canister); key = inner.key};
+                    outer = { canister = Principal.fromActor(outer.canister); key = outer.key};
+                };
             };
             case (#err err) { #err err };
         };
@@ -71,12 +79,58 @@ shared actor class Index() = this {
 
     public shared func delete(guid: [Nat8], {outerCanister: Principal; outerKey: Nac.OuterSubDBKey; sk: Nac.SK}): async () {
         let outer: Partition.Partition = actor(Principal.toText(outerCanister));
-        ignore MyCycles.topUpCycles(Common.dbOptions.partitionCycles);
+        ignore MyCycles.topUpCycles<system>(Common.dbOptions.partitionCycles);
         await* Nac.delete(Blob.fromArray(guid), {dbIndex; outerCanister = outer; outerKey; sk});
     };
 
     public shared func deleteSubDB(guid: [Nat8], {outerCanister: Principal; outerKey: Nac.OuterSubDBKey}) : async () {
-        ignore MyCycles.topUpCycles(Common.dbOptions.partitionCycles);
+        ignore MyCycles.topUpCycles<system>(Common.dbOptions.partitionCycles);
         await* Nac.deleteSubDB(Blob.fromArray(guid), {dbIndex; dbOptions = Common.dbOptions; outerCanister = actor(Principal.toText(outerCanister)); outerKey});
+    };
+
+    /// reorder methods ///
+
+    let orderer = RO.createOrderer({queueLengths = 10});
+
+    public shared func reorderCreateOrder(guid: GUID.GUID): async RO.Order {
+        await* RO.createOrder(guid, {
+            index = this;
+            dbIndex;
+            orderer;
+            hardCap = Common.dbOptions.hardCap;
+        });
+    };
+
+    public shared func reorderAdd(guid: GUID.GUID, options: {
+        order: RO.Order;
+        key: Int;
+        value: Text;
+    }): async () {
+        await* RO.add(guid, {
+            index = this;
+            dbIndex;
+            orderer;
+            order = options.order;
+            key = options.key;
+            value = options.value;
+            hardCap = Common.dbOptions.hardCap;
+        });
+    };
+
+    public shared func reorderMove(guid: GUID.GUID, options: {
+        order: RO.Order;
+        value: Text;
+        relative: Bool;
+        newKey: Int;
+    }): async () {
+        await* RO.move(guid, {
+            index = this;
+            dbIndex;
+            orderer;
+            order = options.order;
+            value = options.value;
+            relative = options.relative;
+            newKey = options.newKey;
+       });
     };
 }

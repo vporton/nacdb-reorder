@@ -63,6 +63,7 @@ module {
     public type AddOptions = {
         index: Nac.IndexCanister;
         dbIndex: Nac.DBIndex;
+        orderer: Orderer;
         order: Order;
         key: Int;
         value: Text;
@@ -79,41 +80,41 @@ module {
     /// Add a key-value pair to an `Order`. The key is inserted as it should by the order.
     ///
     /// We assume that all keys have the same length.
-    public func add(guid: GUID.GUID, orderer: Orderer, options: AddOptions): async* () {
-        ignore OpsQueue.whilePending(orderer.adding, func(guid: GUID.GUID, elt: AddItem): async* () {
+    public func add(guid: GUID.GUID, options: AddOptions): async* () {
+        ignore OpsQueue.whilePending(options.orderer.adding, func(guid: GUID.GUID, elt: AddItem): async* () {
             OpsQueue.answer(
-                orderer.adding,
+                options.orderer.adding,
                 guid,
-                await* addFinishByQueue(guid, orderer, elt));
+                await* addFinishByQueue(guid, elt));
         });
 
-        let adding = switch (OpsQueue.get(orderer.adding, guid)) {
+        let adding = switch (OpsQueue.get(options.orderer.adding, guid)) {
             case (?adding) { adding };
             case null {
                 // TODO: It is enough to use one condition instead of two, because they are bijective.
                 // TODO: duplicate code
-                if (BTree.has(orderer.block, compareLocs, options.order.order) or
-                    BTree.has(orderer.block, compareLocs, options.order.reverse)
+                if (BTree.has(options.orderer.block, compareLocs, options.order.order) or
+                    BTree.has(options.orderer.block, compareLocs, options.order.reverse)
                 ) {
                     Debug.trap("is blocked");
                 };
-                ignore BTree.insert(orderer.block, compareLocs, options.order.order, ());
-                ignore BTree.insert(orderer.block, compareLocs, options.order.reverse, ());
+                ignore BTree.insert(options.orderer.block, compareLocs, options.order.order, ());
+                ignore BTree.insert(options.orderer.block, compareLocs, options.order.reverse, ());
 
                 {
                     options;
-                    random = GUID.nextGuid(orderer.guidGen);
-                    guid1 = GUID.nextGuid(orderer.guidGen);
-                    guid2 = GUID.nextGuid(orderer.guidGen);
+                    random = GUID.nextGuid(options.orderer.guidGen);
+                    guid1 = GUID.nextGuid(options.orderer.guidGen);
+                    guid2 = GUID.nextGuid(options.orderer.guidGen);
                 };
             };
         };
 
         try {
-            await* addFinishByQueue(guid, orderer, adding);
+            await* addFinishByQueue(guid, adding);
         }
         catch(e) {
-            OpsQueue.add(orderer.adding, guid, adding);
+            OpsQueue.add(options.orderer.adding, guid, adding);
             throw e;
         };
     };
@@ -123,7 +124,7 @@ module {
         OpsQueue.result(orderer.adding, guid);
     };
 
-    public func addFinishByQueue(guid: GUID.GUID, orderer: Orderer, adding: AddItem) : async* () {
+    public func addFinishByQueue(_guid: GUID.GUID, adding: AddItem) : async* () {
         let key2 = encodeInt(adding.options.key) # "#" # encodeBlob(adding.random);
         ignore await* Nac.insert(adding.guid1, {
             indexCanister = Principal.fromActor(adding.options.index);
@@ -144,12 +145,14 @@ module {
             hardCap = adding.options.hardCap;
         });
 
-        ignore BTree.delete(orderer.block, compareLocs, adding.options.order.order);
-        ignore BTree.delete(orderer.block, compareLocs, adding.options.order.reverse);
+        ignore BTree.delete(adding.options.orderer.block, compareLocs, adding.options.order.order);
+        ignore BTree.delete(adding.options.orderer.block, compareLocs, adding.options.order.reverse);
     };
 
     public type DeleteOptions = {
+        index: Nac.IndexCanister;
         dbIndex: Nac.DBIndex;
+        orderer: Orderer;
         order: Order;
         value: Text;
     };
@@ -161,38 +164,38 @@ module {
     };
 
     /// Delete a key/value pair (modifies both NacDB sub-DBs `order` and `reverse`).
-    public func delete(guid: GUID.GUID, index: Nac.IndexCanister, orderer: Orderer, options: DeleteOptions): async* () {
-        ignore OpsQueue.whilePending(orderer.deleting, func(guid: GUID.GUID, elt: DeleteItem): async* () {
+    public func delete(guid: GUID.GUID, options: DeleteOptions): async* () {
+        ignore OpsQueue.whilePending(options.orderer.deleting, func(guid: GUID.GUID, elt: DeleteItem): async* () {
             OpsQueue.answer(
-                orderer.deleting,
+                options.orderer.deleting,
                 guid,
-                await* deleteFinishByQueue(index, orderer, elt));
+                await* deleteFinishByQueue(guid, elt));
         });
 
-        let deleting = switch (OpsQueue.get(orderer.deleting, guid)) {
+        let deleting = switch (OpsQueue.get(options.orderer.deleting, guid)) {
             case (?deleting) { deleting };
             case null {
                 // TODO: It is enough to use one condition instead of two, because they are bijective.
-                if (BTree.has(orderer.block, compareLocs, options.order.order) or
-                    BTree.has(orderer.block, compareLocs, options.order.reverse)
+                if (BTree.has(options.orderer.block, compareLocs, options.order.order) or
+                    BTree.has(options.orderer.block, compareLocs, options.order.reverse)
                 ) {
                     Debug.trap("is blocked");
                 };
-                ignore BTree.insert(orderer.block, compareLocs, options.order.order, ());
-                ignore BTree.insert(orderer.block, compareLocs, options.order.reverse, ());
+                ignore BTree.insert(options.orderer.block, compareLocs, options.order.order, ());
+                ignore BTree.insert(options.orderer.block, compareLocs, options.order.reverse, ());
                 {
                     options;
-                    guid1 = GUID.nextGuid(orderer.guidGen);
-                    guid2 = GUID.nextGuid(orderer.guidGen);
+                    guid1 = GUID.nextGuid(options.orderer.guidGen);
+                    guid2 = GUID.nextGuid(options.orderer.guidGen);
                 };
             };
         };
 
         try {
-            await* deleteFinishByQueue(index, orderer, deleting);
+            await* deleteFinishByQueue(guid, deleting);
         }
         catch(e) {
-            OpsQueue.add(orderer.deleting, guid, deleting);
+            OpsQueue.add(options.orderer.deleting, guid, deleting);
             throw e;
         };
     };
@@ -202,7 +205,7 @@ module {
         OpsQueue.result(orderer.deleting, guid);
     };
 
-    public func deleteFinishByQueue(index: Nac.IndexCanister, orderer: Orderer, deleting: DeleteItem) : async* () {
+    public func deleteFinishByQueue(_guid: GUID.GUID, deleting: DeleteItem) : async* () {
         let key = await deleting.options.order.reverse.0.getByOuter({
             outerKey = deleting.options.order.reverse.1;
             sk = deleting.options.value;
@@ -220,8 +223,8 @@ module {
             };
             case null {}; // re-execution after an exception
             case _ {
-                ignore BTree.delete(orderer.block, compareLocs, deleting.options.order.order);
-                ignore BTree.delete(orderer.block, compareLocs, deleting.options.order.reverse);
+                ignore BTree.delete(deleting.options.orderer.block, compareLocs, deleting.options.order.order);
+                ignore BTree.delete(deleting.options.orderer.block, compareLocs, deleting.options.order.reverse);
                 Debug.trap("programming error");
             }
         };
@@ -233,13 +236,15 @@ module {
             sk = deleting.options.value;
         });
 
-        ignore BTree.delete(orderer.block, compareLocs, deleting.options.order.order);
-        ignore BTree.delete(orderer.block, compareLocs, deleting.options.order.reverse);
+        ignore BTree.delete(deleting.options.orderer.block, compareLocs, deleting.options.order.order);
+        ignore BTree.delete(deleting.options.orderer.block, compareLocs, deleting.options.order.reverse);
     };
 
     /// Move value to new key.
     public type MoveOptions = {
+        index: Nac.IndexCanister;
         dbIndex: Nac.DBIndex;
+        orderer: Orderer;
         order: Order;
         value: Text;
         relative: Bool;
@@ -256,41 +261,41 @@ module {
 
     /// Move an item in `order` (that is in both two Nac sub-DBs) to a position specified by `newKey`.
     /// If `relative`, then `newKey` is added to an existing order value rathen than replace it.
-    public func move(guid: GUID.GUID, index: Nac.IndexCanister, orderer: Orderer, options: MoveOptions): async* () {
-        ignore OpsQueue.whilePending(orderer.moving, func(guid: GUID.GUID, elt: MoveItem): async* () {
+    public func move(guid: GUID.GUID, options: MoveOptions): async* () {
+        ignore OpsQueue.whilePending(options.orderer.moving, func(guid: GUID.GUID, elt: MoveItem): async* () {
             OpsQueue.answer(
-                orderer.moving,
+                options.orderer.moving,
                 guid,
-                await* moveFinishByQueue(guid, index, orderer, elt));
+                await* moveFinishByQueue(guid, elt));
         });
 
-        let moving = switch (OpsQueue.get(orderer.moving, guid)) {
+        let moving = switch (OpsQueue.get(options.orderer.moving, guid)) {
             case (?moving) { moving };
             case null {
                 // TODO: It is enough to use one condition instead of two, because they are bijective.
-                if (BTree.has(orderer.block, compareLocs, options.order.order) or
-                    BTree.has(orderer.block, compareLocs, options.order.reverse)
+                if (BTree.has(options.orderer.block, compareLocs, options.order.order) or
+                    BTree.has(options.orderer.block, compareLocs, options.order.reverse)
                 ) {
                     Debug.trap("is blocked");
                 };
-                ignore BTree.insert(orderer.block, compareLocs, options.order.order, ());
-                ignore BTree.insert(orderer.block, compareLocs, options.order.reverse, ());
+                ignore BTree.insert(options.orderer.block, compareLocs, options.order.order, ());
+                ignore BTree.insert(options.orderer.block, compareLocs, options.order.reverse, ());
 
                 {
                     options;
-                    random = GUID.nextGuid(orderer.guidGen);
-                    guid1 = GUID.nextGuid(orderer.guidGen);
-                    guid2 = GUID.nextGuid(orderer.guidGen);
-                    guid3 = GUID.nextGuid(orderer.guidGen);
+                    random = GUID.nextGuid(options.orderer.guidGen);
+                    guid1 = GUID.nextGuid(options.orderer.guidGen);
+                    guid2 = GUID.nextGuid(options.orderer.guidGen);
+                    guid3 = GUID.nextGuid(options.orderer.guidGen);
                 };
             };
         };
 
         try {
-            await* moveFinishByQueue(guid, index, orderer, moving);
+            await* moveFinishByQueue(guid, moving);
         }
         catch(e) {
-            OpsQueue.add(orderer.moving, guid, moving);
+            OpsQueue.add(options.orderer.moving, guid, moving);
             throw e;
         };
     };
@@ -300,7 +305,7 @@ module {
         OpsQueue.result(orderer.moving, guid);
     };
 
-    public func moveFinishByQueue(guid: GUID.GUID, index: Nac.IndexCanister, orderer: Orderer, moving: MoveItem) : async* () {
+    public func moveFinishByQueue(_guid: GUID.GUID, moving: MoveItem) : async* () {
         let newValueText = moving.options.value;
         let oldKey = await moving.options.order.reverse.0.getByOuter({
             outerKey = moving.options.order.reverse.1;
@@ -316,8 +321,8 @@ module {
                     moving.options.newKey;
                 };
                 if (encodeInt(newKey) == oldKeyMainPart) {
-                    ignore BTree.delete(orderer.block, compareLocs, moving.options.order.order);
-                    ignore BTree.delete(orderer.block, compareLocs, moving.options.order.reverse);
+                    ignore BTree.delete(moving.options.orderer.block, compareLocs, moving.options.order.order);
+                    ignore BTree.delete(moving.options.orderer.block, compareLocs, moving.options.order.reverse);
                     return;
                 };
                 newKey;
@@ -332,7 +337,7 @@ module {
         let newKeyText = encodeInt(newKey) # "#" # encodeBlob(moving.random);
 
         ignore await* Nac.insert(moving.guid1, {
-            indexCanister = Principal.fromActor(index);
+            indexCanister = Principal.fromActor(moving.options.index);
             dbIndex = moving.options.dbIndex;
             outerCanister = Principal.fromActor(moving.options.order.order.0);
             outerKey = moving.options.order.order.1;
@@ -341,7 +346,7 @@ module {
             hardCap = null;
         });
         ignore await* Nac.insert(moving.guid2, {
-            indexCanister = Principal.fromActor(index);
+            indexCanister = Principal.fromActor(moving.options.index);
             dbIndex = moving.options.dbIndex;
             outerCanister = Principal.fromActor(moving.options.order.reverse.0);
             outerKey = moving.options.order.reverse.1;
@@ -360,14 +365,14 @@ module {
             };
             case null {}; // re-execution after an exception
             case _ {
-                ignore BTree.delete(orderer.block, compareLocs, moving.options.order.order);
-                ignore BTree.delete(orderer.block, compareLocs, moving.options.order.reverse);
+                ignore BTree.delete(moving.options.orderer.block, compareLocs, moving.options.order.order);
+                ignore BTree.delete(moving.options.orderer.block, compareLocs, moving.options.order.reverse);
                 Debug.trap("programming error");
             }
         };
 
-        ignore BTree.delete(orderer.block, compareLocs, moving.options.order.order);
-        ignore BTree.delete(orderer.block, compareLocs, moving.options.order.reverse);
+        ignore BTree.delete(moving.options.orderer.block, compareLocs, moving.options.order.order);
+        ignore BTree.delete(moving.options.orderer.block, compareLocs, moving.options.order.reverse);
     };
 
     public type CreateOrderOptions = {
@@ -415,8 +420,8 @@ module {
     };
 
     /// Finish an interrupted `createOrder` operation.
-    public func createOrderFinish(guid: GUID.GUID, options: CreateOrderOptions) : async* ?Order {
-        OpsQueue.result(options.orderer.creatingOrder, guid);
+    public func createOrderFinish(guid: GUID.GUID, orderer: Orderer) : async* ?Order {
+        OpsQueue.result(orderer.creatingOrder, guid);
     };
 
     // I run promises in order, rather than paralelly, to ensure they are executed once.
