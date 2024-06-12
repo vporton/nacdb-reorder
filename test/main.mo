@@ -15,9 +15,8 @@ import Int "mo:base/Int";
 import Char "mo:base/Char";
 import Nat32 "mo:base/Nat32";
 import Index "index/main";
-import MyCycles "mo:nacdb/Cycles";
 import GUID "mo:nacdb/GUID";
-import Common "common";
+import Cycles "mo:base/ExperimentalCycles";
 
 actor Test {
     let myArrayTestable : T.Testable<[Text]> = {
@@ -32,9 +31,8 @@ actor Test {
     };
 
     public func main(): async () {
-        MyCycles.addPart<system>(Common.dbOptions.partitionCycles);
+        Cycles.add<system>(100_000_000_000);
         let index = await Index.Index();
-        MyCycles.addPart<system>(Common.dbOptions.partitionCycles);
         await index.init();
 
         let guidGen = GUID.init(Array.tabulate<Nat8>(16, func _ = 0));
