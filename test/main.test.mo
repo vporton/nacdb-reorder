@@ -16,7 +16,6 @@ import Char "mo:base/Char";
 import Nat32 "mo:base/Nat32";
 import Index "index/main";
 import GUID "mo:nacdb/GUID";
-import Common "common";
 
 actor Test {
     let myArrayTestable : T.Testable<[Text]> = {
