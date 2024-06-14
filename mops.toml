@@ -14,7 +14,7 @@ prng = "0.0.3"
 
 [package]
 name = "nacdb-reorder"
-version = "3.1.0"
+version = "3.1.1"
 description = "Reorderable lists in NacDB database"
 repository = "https://github.com/vporton/nacdb-reorder"
 keywords = [ "database", "databases", "order", "reorder", "nacdb" ]
