@@ -29,7 +29,7 @@ module {
         guidGen: GUID.GUIDGenerator;
         adding: OpsQueue.OpsQueue<AddItem, ()>;
         deleting: OpsQueue.OpsQueue<DeleteItem, ()>;
-        moving: OpsQueue.OpsQueue<MoveItem, ()>;
+        moving: OpsQueue.OpsQueue<MoveItem, Bool>;
         creatingOrder: OpsQueue.OpsQueue<CreateOrderItem, Order>;
         block: BTree.BTree<(Nac.OuterCanister, Nac.OuterSubDBKey), ()>;
     };
@@ -261,7 +261,9 @@ module {
 
     /// Move an item in `order` (that is in both two Nac sub-DBs) to a position specified by `newKey`.
     /// If `relative`, then `newKey` is added to an existing order value rathen than replace it.
-    public func move(guid: GUID.GUID, options: MoveOptions): async* () {
+    ///
+    /// Returns `true` if there has been an old value or `false` if inserted.
+    public func move(guid: GUID.GUID, options: MoveOptions): async* Bool {
         ignore OpsQueue.whilePending(options.orderer.moving, func(guid: GUID.GUID, elt: MoveItem): async* () {
             OpsQueue.answer(
                 options.orderer.moving,
@@ -301,16 +303,17 @@ module {
     };
 
     /// Finish an interrupted move operation.
-    public func moveFinish(guid: GUID.GUID, orderer: Orderer) : async* ?() {
+    public func moveFinish(guid: GUID.GUID, orderer: Orderer) : async* ?Bool {
         OpsQueue.result(orderer.moving, guid);
     };
 
-    public func moveFinishByQueue(_guid: GUID.GUID, moving: MoveItem) : async* () {
+    public func moveFinishByQueue(_guid: GUID.GUID, moving: MoveItem) : async* Bool {
         let newValueText = moving.options.value;
         let oldKey = await moving.options.order.reverse.0.getByOuter({
             outerKey = moving.options.order.reverse.1;
             sk = newValueText;
         });
+        let hadOld = oldKey != null;
         let newKey = switch (oldKey) {
             case (?#text oldKeyText) {
                 let oldKeyMainPart = Text.fromIter(Itertools.takeWhile(oldKeyText.chars(), func(c: Char): Bool { c != '#' }));
@@ -323,7 +326,7 @@ module {
                 if (encodeInt(newKey) == oldKeyMainPart) {
                     ignore BTree.delete(moving.options.orderer.block, compareLocs, moving.options.order.order);
                     ignore BTree.delete(moving.options.orderer.block, compareLocs, moving.options.order.reverse);
-                    return;
+                    return hadOld;
                 };
                 newKey;
             };
@@ -373,6 +376,8 @@ module {
 
         ignore BTree.delete(moving.options.orderer.block, compareLocs, moving.options.order.order);
         ignore BTree.delete(moving.options.orderer.block, compareLocs, moving.options.order.reverse);
+
+        hadOld;
     };
 
     public type CreateOrderOptions = {

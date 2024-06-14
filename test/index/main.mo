@@ -115,7 +115,7 @@ shared actor class Index() = this {
         value: Text;
         relative: Bool;
         newKey: Int;
-    }): async () {
+    }): async Bool {
         await* RO.move(guid, {
             index = this;
             dbIndex;
