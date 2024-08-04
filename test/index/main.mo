@@ -2,7 +2,7 @@ import RO "../../src/Reorder";
 import Nac "mo:nacdb/NacDB";
 import GUID "mo:nacdb/GUID";
 import Partition "../partition/main";
-import StableBuffer "mo:stable-buffer/StableBuffer";
+import StableBuffer "mo:stablebuffer/StableBuffer";
 import Principal "mo:base/Principal";
 import Debug "mo:base/Debug";
 import Blob "mo:base/Blob";
