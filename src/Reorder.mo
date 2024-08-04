@@ -31,7 +31,7 @@ module {
         deleting: OpsQueue.OpsQueue<DeleteItem, ()>;
         moving: OpsQueue.OpsQueue<MoveItem, Bool>;
         creatingOrder: OpsQueue.OpsQueue<CreateOrderItem, Order>;
-        block: BTree.BTree<(Nac.OuterCanister, Nac.OuterSubDBKey), ()>;
+        block: BTree.BTree<(Nac.OuterCanisterFull, Nac.OuterSubDBKey), ()>;
     };
 
     /// Create an `Orderer`. Queue length (see `nacdb` package, `OpsQueue` module) are specified.
@@ -56,8 +56,8 @@ module {
     /// Keys may be duplicated, but all values must be distinct.
     public type Order = {
         // A random string is added to a key in order to ensure key are unique.
-        order: (Nac.OuterCanister, Nac.OuterSubDBKey); // Key#random -> Value.
-        reverse: (Nac.OuterCanister, Nac.OuterSubDBKey); // Value -> Key#random
+        order: (Nac.OuterCanisterFull, Nac.OuterSubDBKey); // Key#random -> Value.
+        reverse: (Nac.OuterCanisterFull, Nac.OuterSubDBKey); // Value -> Key#random
     };
 
     public type AddOptions = {
@@ -391,7 +391,7 @@ module {
         options: CreateOrderOptions;
         guid1: GUID.GUID;
         guid2: GUID.GUID;
-        order: ?{canister: Nac.OuterCanister; key: Nac.OuterSubDBKey}; // TODO: To increase performace, store `OuterCanister` instead.
+        order: ?{canister: Nac.OuterCanisterFull; key: Nac.OuterSubDBKey}; // TODO: To increase performace, store `OuterCanister` instead.
     };
 
     /// Create an `Order` (two NacDB sub-DBs).
@@ -448,9 +448,11 @@ module {
             userData = "";
             hardCap = creatingOrder.options.hardCap;
         })).outer;
+        let order2: Nac.OuterCanisterFull = actor(Principal.toText(Principal.fromActor(order.canister)));
+        let reverse2: Nac.OuterCanisterFull = actor(Principal.toText(Principal.fromActor(reverse.canister)));
         {
-            order = (order.canister, order.key);
-            reverse = (reverse.canister, reverse.key);
+            order = (order2, order.key);
+            reverse = (reverse2, reverse.key);
         };
     };
 
@@ -545,11 +547,11 @@ module {
         }
     };
 
-    func comparePartition(x: Nac.PartitionCanister, y: Nac.PartitionCanister): {#equal; #greater; #less} {
+    func comparePartition(x: Nac.PartitionCanisterFull, y: Nac.PartitionCanisterFull): {#equal; #greater; #less} {
         Principal.compare(Principal.fromActor(x), Principal.fromActor(y));
     };
 
-    func compareLocs(x: (Nac.PartitionCanister, Nac.SubDBKey), y: (Nac.PartitionCanister, Nac.SubDBKey)): {#equal; #greater; #less} {
+    func compareLocs(x: (Nac.PartitionCanisterFull, Nac.SubDBKey), y: (Nac.PartitionCanisterFull, Nac.SubDBKey)): {#equal; #greater; #less} {
         let c = comparePartition(x.0, y.0);
         if (c != #equal) {
             c;
